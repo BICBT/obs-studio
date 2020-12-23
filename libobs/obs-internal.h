@@ -337,6 +337,8 @@ struct obs_core_audio {
 	DARRAY(struct audio_monitor *) monitors;
 	char *monitoring_device_name;
 	char *monitoring_device_id;
+
+	bool audio_with_video;
 };
 
 /* user sources, output channels, and displays */
@@ -658,6 +660,7 @@ struct obs_source {
 	uint32_t audio_mixers;
 	float user_volume;
 	float volume;
+	bool audio_lock;
 	int64_t sync_offset;
 	int64_t last_sync_offset;
 	float balance;

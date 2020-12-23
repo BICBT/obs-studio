@@ -380,6 +380,46 @@ static inline void release_audio_sources(struct obs_core_audio *audio)
 		obs_source_release(audio->render_order.array[i]);
 }
 
+struct find_source_param {
+	bool find;
+	obs_source_t *find_source;
+};
+
+static void find_source_by_reference(obs_source_t *parent, obs_source_t *source,
+				     void *param)
+{
+	UNUSED_PARAMETER(parent);
+	struct find_source_param *p = param;
+	p->find = p->find || source == p->find_source;
+}
+
+static bool find_source_in_root_nodes(obs_source_t *source,
+				      struct obs_core_audio *audio)
+{
+	struct find_source_param param = {false, source};
+	for (size_t i = 0; i < audio->root_nodes.num; i++) {
+		obs_source_t *root_source = audio->root_nodes.array[i];
+		obs_source_enum_active_tree(root_source,
+					    find_source_by_reference, &param);
+		if (param.find) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool render_audio_lock(void *param, obs_source_t *source)
+{
+	struct obs_core_audio *audio = param;
+	bool audio_lock = obs_source_get_audio_lock(source);
+
+	// Don't repeated add source to root_node
+	if (audio_lock && !find_source_in_root_nodes(source, audio)) {
+		da_push_back(audio->root_nodes, &source);
+	}
+	return true;
+}
+
 bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 		    uint64_t *out_ts, uint32_t mixers,
 		    struct audio_output_data *mixes)
@@ -409,16 +449,21 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 	/* ------------------------------------------------ */
 	/* build audio render order
 	 * NOTE: these are source channels, not audio channels */
-	for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
-		obs_source_t *source = obs_get_output_source(i);
-		if (source) {
-			obs_source_enum_active_tree(source, push_audio_tree,
-						    audio);
-			push_audio_tree(NULL, source, audio);
-			da_push_back(audio->root_nodes, &source);
-			obs_source_release(source);
+	if (audio->audio_with_video) {
+		for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
+			obs_source_t *source = obs_get_output_source(i);
+			if (source) {
+				obs_source_enum_active_tree(
+					source, push_audio_tree, audio);
+				push_audio_tree(NULL, source, audio);
+				da_push_back(audio->root_nodes, &source);
+				obs_source_release(source);
+			}
 		}
 	}
+
+	// add source with audio lock
+	obs_enum_sources(render_audio_lock, audio);
 
 	pthread_mutex_lock(&data->audio_sources_mutex);
 

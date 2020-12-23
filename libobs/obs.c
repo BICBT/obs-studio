@@ -582,6 +582,7 @@ static bool obs_init_audio(struct audio_output_info *ai)
 		return false;
 
 	audio->user_volume = 1.0f;
+	audio->audio_with_video = true;
 
 	audio->monitoring_device_name = bstrdup("Default");
 	audio->monitoring_device_id = bstrdup("default");
@@ -2531,4 +2532,14 @@ void obs_queue_task(enum obs_task_type type, obs_task_t task, void *param,
 void obs_set_ui_task_handler(obs_task_handler_t handler)
 {
 	obs->ui_task_handler = handler;
+}
+
+bool obs_get_audio_with_video()
+{
+    return obs->audio.audio_with_video;
+}
+
+void obs_set_audio_with_video(bool audio_width_video)
+{
+    obs->audio.audio_with_video = audio_width_video;
 }
