@@ -409,6 +409,7 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 	/* ------------------------------------------------ */
 	/* build audio render order
 	 * NOTE: these are source channels, not audio channels */
+
 	for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
 		obs_source_t *source = obs_get_output_source(i);
 		if (source) {
@@ -419,6 +420,15 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 			obs_source_release(source);
 		}
 	}
+
+//    auto enum_cb = [](void* data, obs_source_t* source) {
+//        uint64_t uid = osn::Source::Manager::GetInstance().find(source);
+//        if (uid != UINT64_MAX) {
+//            static_cast<std::list<uint64_t>*>(data)->push_back(uid);
+//        }
+//        return true;
+//    };
+
 
 	pthread_mutex_lock(&data->audio_sources_mutex);
 

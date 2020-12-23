@@ -2253,6 +2253,12 @@ EXPORT void obs_source_frame_copy(struct obs_source_frame *dst,
 /* Get source icon type */
 EXPORT enum obs_icon_type obs_source_get_icon_type(const char *id);
 
+/** Get whether take audio with video */
+EXPORT bool obs_get_audio_with_video(void);
+
+/** Set whether take audio with video */
+EXPORT void obs_set_audio_with_video(bool audio_with_audio);
+
 #ifdef __cplusplus
 }
 #endif

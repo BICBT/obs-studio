@@ -337,6 +337,8 @@ struct obs_core_audio {
 	DARRAY(struct audio_monitor *) monitors;
 	char *monitoring_device_name;
 	char *monitoring_device_id;
+
+	bool audio_with_video;
 };
 
 /* user sources, output channels, and displays */
