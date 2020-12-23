@@ -409,26 +409,30 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 	/* ------------------------------------------------ */
 	/* build audio render order
 	 * NOTE: these are source channels, not audio channels */
+    if (audio->audio_with_video) {
+        for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
+            obs_source_t *source = obs_get_output_source(i);
+            if (source) {
+                obs_source_enum_active_tree(source, push_audio_tree,
+                                            audio);
+                push_audio_tree(NULL, source, audio);
+                da_push_back(audio->root_nodes, &source);
+                obs_source_release(source);
+            }
+        }
+    }
 
-	for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
-		obs_source_t *source = obs_get_output_source(i);
-		if (source) {
-			obs_source_enum_active_tree(source, push_audio_tree,
-						    audio);
-			push_audio_tree(NULL, source, audio);
-			da_push_back(audio->root_nodes, &source);
-			obs_source_release(source);
-		}
-	}
-
-//    auto enum_cb = [](void* data, obs_source_t* source) {
-//        uint64_t uid = osn::Source::Manager::GetInstance().find(source);
-//        if (uid != UINT64_MAX) {
-//            static_cast<std::list<uint64_t>*>(data)->push_back(uid);
-//        }
-//        return true;
-//    };
-
+    // add source with audio output
+    auto enum_source = [](void* data, obs_source_t* source) {
+        obs_data_t *source_setting = obs_source_get_settings(source);
+        bool audio_output = obs_data_get_bool(source_setting, "audio_output");
+        obs_data_release(source_setting);
+        if (audio_output) {
+            push_audio_tree(NULL, source, audio);
+        }
+        return true;
+    };
+    obs_enum_sources(enum_source, NULL);
 
 	pthread_mutex_lock(&data->audio_sources_mutex);
 

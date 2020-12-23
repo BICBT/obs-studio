@@ -582,6 +582,7 @@ static bool obs_init_audio(struct audio_output_info *ai)
 		return false;
 
 	audio->user_volume = 1.0f;
+    audio->audio_with_video = true;
 
 	audio->monitoring_device_name = bstrdup("Default");
 	audio->monitoring_device_id = bstrdup("default");
