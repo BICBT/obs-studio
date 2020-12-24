@@ -981,6 +981,12 @@ EXPORT void obs_source_set_volume(obs_source_t *source, float volume);
 /** Gets the user volume for a source that has audio output */
 EXPORT float obs_source_get_volume(const obs_source_t *source);
 
+/** Sets the audio lock for a source, which used to render source audio all the time */
+EXPORT void obs_source_set_audio_lock(obs_source_t *source, bool audio_lock);
+
+/** Gets the audio lock for a source, which used to render source audio all the time */
+EXPORT bool obs_source_get_audio_lock(const obs_source_t *source);
+
 /* Gets speaker layout of a source */
 EXPORT enum speaker_layout obs_source_get_speaker_layout(obs_source_t *source);
 
@@ -2252,6 +2258,12 @@ EXPORT void obs_source_frame_copy(struct obs_source_frame *dst,
 /* ------------------------------------------------------------------------- */
 /* Get source icon type */
 EXPORT enum obs_icon_type obs_source_get_icon_type(const char *id);
+
+/** Get whether take audio with video */
+EXPORT bool obs_get_audio_with_video(void);
+
+/** Set whether take audio with video */
+EXPORT void obs_set_audio_with_video(bool audio_with_video);
 
 #ifdef __cplusplus
 }
