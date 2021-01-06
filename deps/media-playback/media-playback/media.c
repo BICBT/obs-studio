@@ -428,7 +428,7 @@ static void mp_media_next_video(mp_media_t *m, bool preload)
 		d->got_first_keyframe = true;
 	}
 
-	if (preload) {
+	if (preload && !m->pause) {
 		if (m->seek_next_ts && m->v_seek_cb) {
 			m->v_seek_cb(m->opaque, frame);
 		} else {
@@ -529,8 +529,6 @@ static bool mp_media_reset(mp_media_t *m)
 		m->play_sys_ts = (int64_t)os_gettime_ns();
 		m->next_ns = 0;
 	}
-
-	m->pause = false;
 
 	if (!active && m->is_local_file && m->v_preload_cb)
 		mp_media_next_video(m, true);

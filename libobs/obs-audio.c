@@ -30,7 +30,6 @@ struct ts_info {
 static void push_audio_tree(obs_source_t *parent, obs_source_t *source, void *p)
 {
 	struct obs_core_audio *audio = p;
-
 	if (da_find(audio->render_order, &source, 0) == DARRAY_INVALID) {
 		obs_source_t *s = obs_source_get_ref(source);
 		if (s)
@@ -108,7 +107,7 @@ static bool discard_if_stopped(obs_source_t *source, size_t channels)
 		return false;
 
 	/* if perpetually pending data, it means the audio has stopped,
-	 * so clear the audio data */
+     * so clear the audio data */
 	if (last_size == size) {
 		if (!source->pending_stop) {
 			source->pending_stop = true;
@@ -448,7 +447,7 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 
 	/* ------------------------------------------------ */
 	/* build audio render order
-	 * NOTE: these are source channels, not audio channels */
+     * NOTE: these are source channels, not audio channels */
 	if (audio->audio_with_video) {
 		for (uint32_t i = 0; i < MAX_CHANNELS; i++) {
 			obs_source_t *source = obs_get_output_source(i);

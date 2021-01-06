@@ -1064,6 +1064,10 @@ static inline void push_back_audio(struct obs_encoder *encoder,
 				   struct audio_data *data, size_t size,
 				   size_t offset_size)
 {
+	if (size < offset_size) {
+		return;
+	}
+
 	size -= offset_size;
 
 	/* push in to the circular buffer */
