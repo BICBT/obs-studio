@@ -3727,16 +3727,16 @@ float obs_source_get_volume(const obs_source_t *source)
 
 void obs_source_set_audio_lock(obs_source_t *source, bool audio_lock)
 {
-    if (obs_source_valid(source, "obs_source_set_audio_lock")) {
-        source->audio_lock = audio_lock;
-    }
+	if (obs_source_valid(source, "obs_source_set_audio_lock")) {
+		source->audio_lock = audio_lock;
+	}
 }
 
 bool obs_source_get_audio_lock(const obs_source_t *source)
 {
-    return obs_source_valid(source, "obs_source_get_audio_lock")
-           ? source->audio_lock
-           : false;
+	return obs_source_valid(source, "obs_source_get_audio_lock")
+		       ? source->audio_lock
+		       : false;
 }
 
 void obs_source_set_sync_offset(obs_source_t *source, int64_t offset)

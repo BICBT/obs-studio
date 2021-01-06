@@ -2536,10 +2536,10 @@ void obs_set_ui_task_handler(obs_task_handler_t handler)
 
 bool obs_get_audio_with_video()
 {
-    return obs->audio.audio_with_video;
+	return obs->audio.audio_with_video;
 }
 
 void obs_set_audio_with_video(bool audio_width_video)
 {
-    obs->audio.audio_with_video = audio_width_video;
+	obs->audio.audio_with_video = audio_width_video;
 }
