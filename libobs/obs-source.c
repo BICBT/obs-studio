@@ -102,6 +102,8 @@ static const char *source_signals[] = {
 	"void media_previous(ptr source)",
 	"void media_started(ptr source)",
 	"void media_ended(ptr source)",
+	"void media_get_audio(ptr source, ptr audio)",
+	"void media_get_frame(ptr source, ptr frame)",
 	NULL,
 };
 
@@ -5054,4 +5056,38 @@ void obs_source_media_ended(obs_source_t *source)
 		return;
 
 	obs_source_dosignal(source, NULL, "media_ended");
+}
+
+void obs_source_media_get_audio(obs_source_t *source,
+				struct obs_source_audio *audio)
+{
+	if (!obs_source_valid(source, "obs_source_media_get_audio"))
+		return;
+
+	struct calldata data;
+	uint8_t stack[128];
+
+	calldata_init_fixed(&data, stack, sizeof(stack));
+	calldata_set_ptr(&data, "source", source);
+	calldata_set_ptr(&data, "audio", audio);
+
+	signal_handler_signal(source->context.signals, "media_get_audio",
+			      &data);
+}
+
+void obs_source_media_get_frame(obs_source_t *source,
+				struct obs_source_frame *frame)
+{
+	if (!obs_source_valid(source, "obs_source_media_get_frame"))
+		return;
+
+	struct calldata data;
+	uint8_t stack[128];
+
+	calldata_init_fixed(&data, stack, sizeof(stack));
+	calldata_set_ptr(&data, "source", source);
+	calldata_set_ptr(&data, "frame", frame);
+
+	signal_handler_signal(source->context.signals, "media_get_frame",
+			      &data);
 }
