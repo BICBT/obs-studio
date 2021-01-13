@@ -247,6 +247,8 @@ static void get_frame(void *opaque, struct obs_source_frame *f)
 {
 	struct ffmpeg_source *s = opaque;
 	obs_source_output_video(s->source, f);
+
+	obs_source_media_get_frame(s->source, f);
 }
 
 static void preload_frame(void *opaque, struct obs_source_frame *f)
@@ -275,6 +277,8 @@ static void get_audio(void *opaque, struct obs_source_audio *a)
 
 	if (!s->is_local_file && os_atomic_set_bool(&s->reconnecting, false))
 		FF_BLOG(LOG_INFO, "Reconnected.");
+
+	obs_source_media_get_audio(s->source, a);
 }
 
 static void media_stopped(void *opaque)
