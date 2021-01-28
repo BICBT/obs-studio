@@ -669,6 +669,7 @@ struct obs_source {
 	gs_texture_t *async_textures[MAX_AV_PLANES];
 	gs_texrender_t *async_texrender;
 	struct obs_source_frame *cur_async_frame;
+	uint64_t cur_async_frame_timestamp;
 	bool async_gpu_conversion;
 	enum video_format async_format;
 	bool async_full_range;

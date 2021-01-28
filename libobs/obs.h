@@ -1249,6 +1249,8 @@ EXPORT void obs_source_update_properties(obs_source_t *source);
 /** Gets the current async video frame */
 EXPORT struct obs_source_frame *obs_source_get_frame(obs_source_t *source);
 
+EXPORT uint64_t obs_source_get_frame_timestamp(obs_source_t *source);
+
 /** Releases the current async video frame */
 EXPORT void obs_source_release_frame(obs_source_t *source,
 				     struct obs_source_frame *frame);
