@@ -1083,6 +1083,10 @@ static void async_tick(obs_source_t *source)
 		}
 
 		source->cur_async_frame = get_closest_frame(source, sys_time);
+		if (source->cur_async_frame) {
+			source->cur_async_frame_timestamp =
+				source->cur_async_frame->timestamp;
+		}
 	}
 
 	source->last_sys_timestamp = sys_time;
@@ -3416,6 +3420,14 @@ struct obs_source_frame *obs_source_get_frame(obs_source_t *source)
 	pthread_mutex_unlock(&source->async_mutex);
 
 	return frame;
+}
+
+uint64_t obs_source_get_frame_timestamp(obs_source_t *source)
+{
+	if (!obs_source_valid(source, "obs_source_get_frame_timestamp"))
+		return 0;
+
+	return source->cur_async_frame_timestamp;
 }
 
 void obs_source_release_frame(obs_source_t *source,
