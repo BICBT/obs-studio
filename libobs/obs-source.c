@@ -3427,7 +3427,13 @@ uint64_t obs_source_get_frame_timestamp(obs_source_t *source)
 	if (!obs_source_valid(source, "obs_source_get_frame_timestamp"))
 		return 0;
 
-	return source->cur_async_frame_timestamp;
+	pthread_mutex_lock(&source->async_mutex);
+
+	uint64_t ts = source->cur_async_frame_timestamp;
+
+	pthread_mutex_unlock(&source->async_mutex);
+
+	return ts;
 }
 
 void obs_source_release_frame(obs_source_t *source,
