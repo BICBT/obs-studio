@@ -229,8 +229,13 @@ void fill_vertex_buffer(struct ft2_source *srcdata)
 	srcdata->cy = max_y;
 }
 
-void cache_standard_glyphs(struct ft2_source *srcdata)
+void cache_standard_glyphs(struct ft2_source *srcdata, obs_data_t *settings)
 {
+	bool cache_standard = obs_data_get_bool(settings, "cache_standard");
+	if (!cache_standard) {
+		return;
+	}
+
 	for (uint32_t i = 0; i < num_cache_slots; i++) {
 		if (srcdata->cacheglyphs[i] != NULL) {
 			bfree(srcdata->cacheglyphs[i]);
