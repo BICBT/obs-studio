@@ -320,6 +320,11 @@ struct obs_core_video {
 
 struct audio_monitor;
 
+struct audio_output_cb_info {
+        obs_audio_output_callback_t callback;
+        void *param;
+};
+
 struct obs_core_audio {
 	audio_t *audio;
 
@@ -339,6 +344,10 @@ struct obs_core_audio {
 	char *monitoring_device_id;
 
 	bool audio_with_video;
+
+	struct audio_monitor *output_monitor;
+        pthread_mutex_t audio_output_cb_list_mutex;
+        DARRAY(struct audio_output_cb_info) audio_output_cb_list;
 };
 
 /* user sources, output channels, and displays */
