@@ -63,6 +63,7 @@ static inline void mix_audio(struct audio_output_data *mixes,
 		total_floats -= start_point;
 	}
 
+	float master_volume = obs_get_master_volume();
 	for (size_t mix_idx = 0; mix_idx < MAX_AUDIO_MIXES; mix_idx++) {
 		for (size_t ch = 0; ch < channels; ch++) {
 			register float *mix = mixes[mix_idx].data[ch];
@@ -74,7 +75,7 @@ static inline void mix_audio(struct audio_output_data *mixes,
 			end = aud + total_floats;
 
 			while (aud < end)
-				*(mix++) += *(aud++);
+				*(mix++) += *(aud++) * master_volume;
 		}
 	}
 }
