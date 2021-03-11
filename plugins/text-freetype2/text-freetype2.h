@@ -94,7 +94,7 @@ time_t get_modified_timestamp(char *filename);
 void load_text_from_file(struct ft2_source *srcdata, const char *filename);
 void read_from_end(struct ft2_source *srcdata, const char *filename);
 
-void cache_standard_glyphs(struct ft2_source *srcdata, obs_data_t *settings);
+void cache_standard_glyphs(struct ft2_source *srcdata);
 void cache_glyphs(struct ft2_source *srcdata, wchar_t *cache_glyphs);
 
 void set_up_vertex_buffer(struct ft2_source *srcdata);

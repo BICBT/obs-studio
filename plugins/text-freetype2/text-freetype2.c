@@ -406,7 +406,7 @@ static void ft2_source_update(void *data, obs_data_t *settings)
 		if (srcdata->texbuf != NULL) {
 			memset(srcdata->texbuf, 0, texbuf_size);
 		}
-		cache_standard_glyphs(srcdata, settings);
+		cache_standard_glyphs(srcdata);
 	}
 
 	srcdata->file_load_failed = false;
@@ -448,7 +448,7 @@ static void ft2_source_update(void *data, obs_data_t *settings)
 	srcdata->texbuf = bzalloc(texbuf_size);
 
 	if (srcdata->font_face)
-		cache_standard_glyphs(srcdata, settings);
+		cache_standard_glyphs(srcdata);
 
 skip_font_load:
 	if (from_file) {
@@ -534,8 +534,6 @@ static void *ft2_source_create(obs_data_t *settings, obs_source_t *source,
 
 	obs_data_set_default_int(settings, "color1", 0xFFFFFFFF);
 	obs_data_set_default_int(settings, "color2", 0xFFFFFFFF);
-
-	obs_data_set_default_bool(settings, "cache_standard", true);
 
 	ft2_source_update(srcdata, settings);
 
