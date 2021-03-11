@@ -213,7 +213,7 @@ void fill_vertex_buffer(struct ft2_source *srcdata)
 
 		set_v3_rect(vdata->points + (cur_glyph * 6),
 			    (float)dx + (float)src_glyph->xoff,
-			    (float)dy - (float)src_glyph->yoff,
+			    (float)((dy - src_glyph->yoff) / 2), // draw text in line middle, same with frontend designer.
 			    (float)src_glyph->w, (float)src_glyph->h);
 		set_v2_uv(tvarray + (cur_glyph * 6), src_glyph->u, src_glyph->v,
 			  src_glyph->u2, src_glyph->v2);
@@ -229,13 +229,8 @@ void fill_vertex_buffer(struct ft2_source *srcdata)
 	srcdata->cy = max_y;
 }
 
-void cache_standard_glyphs(struct ft2_source *srcdata, obs_data_t *settings)
+void cache_standard_glyphs(struct ft2_source *srcdata)
 {
-	bool cache_standard = obs_data_get_bool(settings, "cache_standard");
-	if (!cache_standard) {
-		return;
-	}
-
 	for (uint32_t i = 0; i < num_cache_slots; i++) {
 		if (srcdata->cacheglyphs[i] != NULL) {
 			bfree(srcdata->cacheglyphs[i]);
