@@ -75,7 +75,7 @@ static struct obs_source_info freetype2_source_info_v2 = {
 
 static bool plugin_initialized = false;
 
-static void init_plugin(void)
+static void init_plugin(obs_data_t *settings)
 {
 	if (plugin_initialized)
 		return;
@@ -87,8 +87,14 @@ static void init_plugin(void)
 		return;
 	}
 
-	if (!load_cached_os_font_list())
-		load_os_font_list();
+	const char *custom_font_path = obs_data_get_string(settings, "custom_font_path");
+
+	if (strlen(custom_font_path) != NULL) {
+	    load_custom_font(custom_font_path);
+	} else {
+        if (!load_cached_os_font_list())
+            load_os_font_list();
+	}
 
 	plugin_initialized = true;
 }
@@ -518,7 +524,7 @@ static void *ft2_source_create(obs_data_t *settings, obs_source_t *source,
 	obs_data_t *font_obj = obs_data_create();
 	srcdata->src = source;
 
-	init_plugin();
+	init_plugin(settings);
 
 	const uint16_t font_size = ver == 1 ? 32 : 256;
 
