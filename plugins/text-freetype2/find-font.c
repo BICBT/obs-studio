@@ -2,7 +2,10 @@
 #include <ctype.h>
 #include <time.h>
 #include <obs-module.h>
+#include <dirent.h>
 #include "find-font.h"
+
+extern FT_Library ft2_lib;
 
 DARRAY(struct font_path_info) font_list;
 
@@ -407,4 +410,41 @@ const char *get_font_path(const char *family, uint16_t size, const char *style,
 	dstr_free(&style_str);
 	dstr_free(&face_and_style);
 	return best_path;
+}
+
+void load_custom_font(const char *path) {
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(path);
+    if (d) {
+        while ((dir = readdir(d)) != NULL)
+        {
+            struct dstr full_path = {0};
+            FT_Face face;
+            FT_Long idx = 0;
+            FT_Long max_faces = 1;
+
+            dstr_cat(&full_path, path);
+#ifdef _WIN32
+            dstr_cat(&full_path, "\\");
+#else
+            dstr_cat(&full_path, "/");
+#endif
+            dstr_cat(&full_path, dir->d_name);
+
+            while (idx < max_faces) {
+                FT_Error ret = FT_New_Face(ft2_lib, full_path.array,
+                                           idx, &face);
+                if (ret != 0)
+                    break;
+
+                build_font_path_info(face, idx++, full_path.array);
+                max_faces = face->num_faces;
+                FT_Done_Face(face);
+            }
+
+            dstr_free(&full_path);
+        }
+        closedir(d);
+    }
 }
