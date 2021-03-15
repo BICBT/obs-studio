@@ -89,7 +89,7 @@ static void init_plugin(obs_data_t *settings)
 
 	const char *custom_font_path = obs_data_get_string(settings, "custom_font_path");
 
-	if (strlen(custom_font_path) != NULL) {
+	if (strlen(custom_font_path) != 0) {
 	    load_custom_font(custom_font_path);
 	} else {
         if (!load_cached_os_font_list())

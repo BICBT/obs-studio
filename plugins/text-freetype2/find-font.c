@@ -2,8 +2,12 @@
 #include <ctype.h>
 #include <time.h>
 #include <obs-module.h>
-#include <dirent.h>
 #include "find-font.h"
+#ifdef _WIN32
+#include "dirent.h"
+#else
+#include <dirent.h>
+#endif
 
 extern FT_Library ft2_lib;
 
