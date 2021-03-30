@@ -1123,6 +1123,8 @@ static bool buffer_audio(struct obs_encoder *encoder, struct audio_data *data)
 		/* no video yet, so don't start audio */
 		if (!v_start_ts) {
 			success = false;
+			clear_audio(encoder);
+			encoder->first_raw_ts = data->timestamp;
 			goto fail;
 		}
 
