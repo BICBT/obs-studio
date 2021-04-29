@@ -159,18 +159,17 @@ static int mp_media_next_packet(mp_media_t *media)
 	}
 
 	//get sei content
-        if (pkt.flags & AV_PKT_FLAG_KEY) {
-                if ((pkt.data[4] & 0x1F) == 6 ||(pkt.data[10] & 0x1F) == 6) {
-                        int64_t * buffer = NULL;
-                        uint32_t count = 0;
-                        int ret = get_sei_content(pkt.data, pkt.size, uuid,&buffer, &count);
-                        if (ret >0){
-                                media->obsframe.sei_timestamp = *((uint64_t*)buffer);
-                                blog(LOG_DEBUG, "sei_length:%d sei_timestamp:%lld\n", ret, media->obsframe.sei_timestamp);
-			}
-		}
-	}else{
-                media->obsframe.sei_timestamp = 0;
+    if (pkt.flags & AV_PKT_FLAG_KEY) {
+        if ((pkt.data[4] & 0x1F) == 6 ||(pkt.data[10] & 0x1F) == 6) {
+                int64_t * buffer = NULL;
+                uint32_t count = 0;
+                int ret = get_sei_content(pkt.data, pkt.size, uuid,&buffer, &count);
+                if (ret >0) {
+                        media->obsframe.sei_timestamp = *((uint64_t*)buffer);
+                }
+        }
+	} else{
+        media->obsframe.sei_timestamp = 0;
 	}
 	//end
 
@@ -434,28 +433,13 @@ static void mp_media_next_video(mp_media_t *m, bool preload)
 	if (frame->format == VIDEO_FORMAT_NONE)
 		return;
 
-	if (frame->sei_timestamp > 0 /*&& m->vtime_diff == 0*/){
-                uint64_t tmp_ts = m->base_ts + d->frame_pts - m->start_ts + m->play_sys_ts - base_sys_ts;
-                uint64_t last_diff = m->vtime_diff;
-		m->vtime_diff = frame->sei_timestamp * 1000000 - tmp_ts;
-                uint64_t last_sei = frame->sei_timestamp;
-                frame->timestamp = tmp_ts + m->vtime_diff;
-                /*blog(LOG_DEBUG, "[%s] frame_timestamp=%lld, sei_timestamp=%lld, tmp_ts=%lld, frame_pts=%lld, vtime_diff=%lld \n",
-		     m->path, frame->timestamp, frame->sei_timestamp, tmp_ts, d->frame_pts, m->vtime_diff);*/
-                uint64_t sei_diff = frame->sei_timestamp - last_sei;
-		uint64_t diff_diff = m->vtime_diff - last_diff;
-                blog(LOG_DEBUG, "[%s] sei_diff=%lld, pts=%lld, vdiff_diff=%lld \n", m->path, sei_diff, d->frame_pts, diff_diff);
-		if ((sei_diff > diff_diff && sei_diff * 1000000 - diff_diff > 80000000)
-		    || (sei_diff < diff_diff && diff_diff * 1000000 - sei_diff > 80000000)) {
-                        blog(LOG_DEBUG, "[%s] diff exceed limit \n", m->path);
-		}
-	}else{
-                uint64_t tmp_ts = m->base_ts + d->frame_pts - m->start_ts + m->play_sys_ts - base_sys_ts;
-                frame->timestamp = tmp_ts + m->vtime_diff;
-                //frame->timestamp = d->frame_pts;
-                /*blog(LOG_DEBUG, "[%s] frame_timestamp=%lld, tmp_ts=%lld, frame_pts=%lld, vtime_diff=%lld \n",
-                     m->path, frame->timestamp, tmp_ts, d->frame_pts, m->vtime_diff);*/
-	}
+    frame->timestamp = m->base_ts + d->frame_pts - m->start_ts + m->play_sys_ts - base_sys_ts;
+    if (frame->sei_timestamp > 0) {
+        m->vtime_diff = frame->sei_timestamp - frame->timestamp;
+        frame->timestamp = frame->sei_timestamp;
+    } else {
+        frame->timestamp += m->vtime_diff;
+    }
 
 	frame->width = f->width;
 	frame->height = f->height;

@@ -770,6 +770,9 @@ struct obs_source {
 	enum obs_monitoring_type monitoring_type;
 
 	obs_data_t *private_settings;
+
+	// multi source sync
+	bool multi_source_sync;
 };
 
 extern struct obs_source_info *get_source_info(const char *id);

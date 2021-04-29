@@ -3295,11 +3295,9 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	uint64_t frame_time = next_frame->timestamp;
 	uint64_t frame_offset = 0;
 
-        if (source->last_frame_ts > obs->video.min_source_frame_ts && (source->last_frame_ts - obs->video.min_source_frame_ts) < MAX_TS_VAR) {
-                blog(LOG_DEBUG, "[%s] adjust last_frame_ts:%lld min_source_frame_ts:%lld \n",
-		     obs_source_get_name(source), source->last_frame_ts, obs->video.min_source_frame_ts);
-                source->last_frame_ts = obs->video.min_source_frame_ts;
-        }
+    if (source->multi_source_sync && (source->last_frame_ts > obs->video.min_source_frame_ts && (source->last_frame_ts - obs->video.min_source_frame_ts) < MAX_TS_VAR)) {
+        source->last_frame_ts = obs->video.min_source_frame_ts;
+    }
 
 	if (source->async_unbuffered) {
 		while (source->async_frames.num > 1) {
@@ -3311,8 +3309,6 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		source->last_frame_ts = next_frame->timestamp;
 		return true;
 	}
-        blog(LOG_DEBUG, "[%s] ready_async_frame last_frame_ts:%lld min_source_frame_ts:%lld \n",
-             obs_source_get_name(source), source->last_frame_ts, obs->video.min_source_frame_ts);
 
 #if DEBUG_ASYNC_FRAMES
 	blog(LOG_DEBUG,
@@ -3400,8 +3396,6 @@ static inline struct obs_source_frame *get_closest_frame(obs_source_t *source,
 
 		if (!source->last_frame_ts)
                         source->last_frame_ts = frame->timestamp;
-                blog(LOG_DEBUG, "[%s] get_closest_frame last_frame_ts:%lld \n",
-                             obs_source_get_name(source), frame->timestamp);
 
 		return frame;
 	}
@@ -5122,4 +5116,10 @@ void obs_source_media_get_frame(obs_source_t *source,
 
 	signal_handler_signal(source->context.signals, "media_get_frame",
 			      &data);
+}
+
+void obs_source_set_multi_source_sync(obs_source_t *source, bool multi_source_sync) {
+    if (!obs_source_valid(source, "obs_source_set_multi_source_sync"))
+        return;
+    source->multi_source_sync = multi_source_sync;
 }

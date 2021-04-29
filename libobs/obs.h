@@ -1395,6 +1395,9 @@ EXPORT void obs_source_media_get_audio(obs_source_t *source,
 EXPORT void obs_source_media_get_frame(obs_source_t *source,
 				       struct obs_source_frame *frame);
 
+/** Multi source sync */
+EXPORT void obs_source_set_multi_source_sync(obs_source_t *source, bool multi_source_sync);
+
 /* ------------------------------------------------------------------------- */
 /* Transition-specific functions */
 enum obs_transition_target {
