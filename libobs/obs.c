@@ -532,6 +532,8 @@ static void obs_free_video(void)
 
 		video->gpu_encoder_active = 0;
 		video->cur_texture = 0;
+
+		video->min_source_frame_ts = 0;
 	}
 }
 

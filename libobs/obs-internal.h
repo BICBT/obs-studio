@@ -316,6 +316,8 @@ struct obs_core_video {
 
 	pthread_mutex_t task_mutex;
 	struct circlebuf tasks;
+
+	uint64_t min_source_frame_ts;
 };
 
 struct audio_monitor;
@@ -819,7 +821,7 @@ static inline void obs_source_dosignal(struct obs_source *source,
 }
 
 /* maximum timestamp variance in nanoseconds */
-#define MAX_TS_VAR 2000000000ULL
+#define MAX_TS_VAR 5000000000ULL
 
 static inline bool frame_out_of_bounds(const obs_source_t *source, uint64_t ts)
 {

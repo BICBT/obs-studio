@@ -231,6 +231,7 @@ struct obs_source_frame {
 	uint32_t width;
 	uint32_t height;
 	uint64_t timestamp;
+	int64_t sei_timestamp;
 
 	enum video_format format;
 	float color_matrix[16];

@@ -1189,7 +1189,7 @@ static inline size_t conv_time_to_frames(const size_t sample_rate,
 }
 
 /* maximum buffer size */
-#define MAX_BUF_SIZE (1000 * AUDIO_OUTPUT_FRAMES * sizeof(float))
+#define MAX_BUF_SIZE (5000 * AUDIO_OUTPUT_FRAMES * sizeof(float))
 
 /* time threshold in nanoseconds to ensure audio timing is as seamless as
  * possible */
@@ -2630,6 +2630,7 @@ static void copy_frame_data(struct obs_source_frame *dst,
 	dst->flip = src->flip;
 	dst->full_range = src->full_range;
 	dst->timestamp = src->timestamp;
+	dst->sei_timestamp = src->sei_timestamp;
 	memcpy(dst->color_matrix, src->color_matrix, sizeof(float) * 16);
 	if (!dst->full_range) {
 		size_t const size = sizeof(float) * 3;
@@ -2732,7 +2733,7 @@ static void clean_cache(obs_source_t *source)
 	}
 }
 
-#define MAX_ASYNC_FRAMES 30
+#define MAX_ASYNC_FRAMES 125
 //if return value is not null then do (os_atomic_dec_long(&output->refs) == 0) && obs_source_frame_destroy(output)
 static inline struct obs_source_frame *
 cache_video(struct obs_source *source, const struct obs_source_frame *frame)
@@ -3294,6 +3295,12 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	uint64_t frame_time = next_frame->timestamp;
 	uint64_t frame_offset = 0;
 
+        if (source->last_frame_ts > obs->video.min_source_frame_ts && (source->last_frame_ts - obs->video.min_source_frame_ts) < MAX_TS_VAR) {
+                blog(LOG_DEBUG, "[%s] adjust last_frame_ts:%lld min_source_frame_ts:%lld \n",
+		     obs_source_get_name(source), source->last_frame_ts, obs->video.min_source_frame_ts);
+                source->last_frame_ts = obs->video.min_source_frame_ts;
+        }
+
 	if (source->async_unbuffered) {
 		while (source->async_frames.num > 1) {
 			da_erase(source->async_frames, 0);
@@ -3304,6 +3311,8 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		source->last_frame_ts = next_frame->timestamp;
 		return true;
 	}
+        blog(LOG_DEBUG, "[%s] ready_async_frame last_frame_ts:%lld min_source_frame_ts:%lld \n",
+             obs_source_get_name(source), source->last_frame_ts, obs->video.min_source_frame_ts);
 
 #if DEBUG_ASYNC_FRAMES
 	blog(LOG_DEBUG,
@@ -3316,16 +3325,20 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 #endif
 
 	/* account for timestamp invalidation */
-	if (frame_out_of_bounds(source, frame_time)) {
+	/*if (frame_out_of_bounds(source, frame_time)) {
 #if DEBUG_ASYNC_FRAMES
 		blog(LOG_DEBUG, "timing jump");
 #endif
-		source->last_frame_ts = next_frame->timestamp;
+                source->last_frame_ts = next_frame->timestamp;
+                blog(LOG_DEBUG, "[%s] bounds last_frame_ts:%lld min_source_frame_ts:%lld \n", obs_source_get_name(source), source->last_frame_ts,obs->video.min_source_frame_ts);
 		return true;
 	} else {
 		frame_offset = frame_time - source->last_frame_ts;
 		source->last_frame_ts += sys_offset;
-	}
+                blog(LOG_DEBUG, "[%s] offset frame_offset:%lld sys_offset:%lld frames_num:%lld \n", obs_source_get_name(source), frame_offset, sys_offset, source->async_frames.num);
+	}*/
+        frame_offset = frame_time - source->last_frame_ts;
+        source->last_frame_ts += sys_offset;
 
 	while (source->last_frame_ts > next_frame->timestamp) {
 
@@ -3333,8 +3346,8 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		 * helps smooth out async rendering to frame boundaries.  In
 		 * other words, tries to keep the framerate as smooth as
 		 * possible */
-		if ((source->last_frame_ts - next_frame->timestamp) < 2000000)
-			break;
+		//if ((source->last_frame_ts - next_frame->timestamp) < 2000000)
+		//	break;
 
 		if (frame)
 			da_erase(source->async_frames, 0);
@@ -3348,7 +3361,6 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 #endif
 
 		remove_async_frame(source, frame);
-
 		if (source->async_frames.num == 1)
 			return true;
 
@@ -3387,7 +3399,9 @@ static inline struct obs_source_frame *get_closest_frame(obs_source_t *source,
 		da_erase(source->async_frames, 0);
 
 		if (!source->last_frame_ts)
-			source->last_frame_ts = frame->timestamp;
+                        source->last_frame_ts = frame->timestamp;
+                blog(LOG_DEBUG, "[%s] get_closest_frame last_frame_ts:%lld \n",
+                             obs_source_get_name(source), frame->timestamp);
 
 		return frame;
 	}

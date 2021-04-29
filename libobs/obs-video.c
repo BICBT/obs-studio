@@ -62,6 +62,18 @@ static uint64_t tick_sources(uint64_t cur_time, uint64_t last_time)
 	pthread_mutex_lock(&data->sources_mutex);
 
 	source = data->first_source;
+	uint64_t min_last_frame_ts = 0;
+        while (source) {
+                struct obs_source *cur_source = obs_source_get_ref(source);
+		if (min_last_frame_ts == 0
+		    || (cur_source->last_frame_ts && cur_source->last_frame_ts < min_last_frame_ts)) {
+                        min_last_frame_ts = cur_source->last_frame_ts;
+		}
+                source = (struct obs_source *)source->context.next;
+        }
+	obs->video.min_source_frame_ts = min_last_frame_ts;
+
+        source = data->first_source;
 	while (source) {
 		struct obs_source *cur_source = obs_source_get_ref(source);
 		source = (struct obs_source *)source->context.next;
