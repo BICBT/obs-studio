@@ -341,9 +341,14 @@ static void ffmpeg_source_start(struct ffmpeg_source *s)
 static void *ffmpeg_source_reconnect(void *data)
 {
 	struct ffmpeg_source *s = data;
-	os_sleep_ms(s->reconnect_delay_sec * 1000);
 
-	if (s->stop_reconnect || s->media_valid)
+	for (int i = 0; i < s->reconnect_delay_sec * 100; i++) {
+		os_sleep_ms(10);
+		if (s->stop_reconnect)
+			goto finish;
+	}
+
+	if (s->media_valid)
 		goto finish;
 
 	bool active = obs_source_active(s->source);
