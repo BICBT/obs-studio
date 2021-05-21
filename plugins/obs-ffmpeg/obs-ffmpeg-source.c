@@ -246,8 +246,8 @@ static void dump_source_info(struct ffmpeg_source *s, const char *input,
 static void get_frame(void *opaque, struct obs_source_frame *f)
 {
 	struct ffmpeg_source *s = opaque;
-	if (f->sei_timestamp > 0) {
-        obs_source_set_multi_source_sync(s->source, true);
+	if (f->external_timestamp > 0) {
+                obs_source_set_multi_source_sync(s->source, true);
 	}
 	obs_source_output_video(s->source, f);
 	obs_source_media_get_frame(s->source, f);

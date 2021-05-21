@@ -1086,6 +1086,10 @@ static void async_tick(obs_source_t *source)
 		if (source->cur_async_frame) {
 			source->cur_async_frame_timestamp =
 				source->cur_async_frame->timestamp;
+			source->cur_server_timestamp =
+				source->cur_async_frame->server_timestamp;
+			source->cur_external_timestamp =
+				source->cur_async_frame->external_timestamp;
 		}
 	}
 
@@ -1189,7 +1193,7 @@ static inline size_t conv_time_to_frames(const size_t sample_rate,
 }
 
 /* maximum buffer size */
-#define MAX_BUF_SIZE (5000 * AUDIO_OUTPUT_FRAMES * sizeof(float))
+#define MAX_BUF_SIZE (1000 * AUDIO_OUTPUT_FRAMES * sizeof(float))
 
 /* time threshold in nanoseconds to ensure audio timing is as seamless as
  * possible */
@@ -2630,7 +2634,8 @@ static void copy_frame_data(struct obs_source_frame *dst,
 	dst->flip = src->flip;
 	dst->full_range = src->full_range;
 	dst->timestamp = src->timestamp;
-	dst->sei_timestamp = src->sei_timestamp;
+	dst->external_timestamp = src->external_timestamp;
+	dst->server_timestamp = src->server_timestamp;
 	memcpy(dst->color_matrix, src->color_matrix, sizeof(float) * 16);
 	if (!dst->full_range) {
 		size_t const size = sizeof(float) * 3;
@@ -3295,9 +3300,12 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	uint64_t frame_time = next_frame->timestamp;
 	uint64_t frame_offset = 0;
 
-    if (source->multi_source_sync && (source->last_frame_ts > obs->video.min_source_frame_ts && (source->last_frame_ts - obs->video.min_source_frame_ts) < MAX_TS_VAR)) {
-        source->last_frame_ts = obs->video.min_source_frame_ts;
-    }
+	if (source->multi_source_sync &&
+	    (source->last_frame_ts > obs->video.min_source_frame_ts &&
+	     (source->last_frame_ts - obs->video.min_source_frame_ts) <
+		     MAX_TS_VAR)) {
+		source->last_frame_ts = obs->video.min_source_frame_ts;
+	}
 
 	if (source->async_unbuffered) {
 		while (source->async_frames.num > 1) {
@@ -3321,20 +3329,16 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 #endif
 
 	/* account for timestamp invalidation */
-	/*if (frame_out_of_bounds(source, frame_time)) {
+	if (frame_out_of_bounds(source, frame_time)) {
 #if DEBUG_ASYNC_FRAMES
 		blog(LOG_DEBUG, "timing jump");
 #endif
-                source->last_frame_ts = next_frame->timestamp;
-                blog(LOG_DEBUG, "[%s] bounds last_frame_ts:%lld min_source_frame_ts:%lld \n", obs_source_get_name(source), source->last_frame_ts,obs->video.min_source_frame_ts);
+		source->last_frame_ts = next_frame->timestamp;
 		return true;
 	} else {
 		frame_offset = frame_time - source->last_frame_ts;
 		source->last_frame_ts += sys_offset;
-                blog(LOG_DEBUG, "[%s] offset frame_offset:%lld sys_offset:%lld frames_num:%lld \n", obs_source_get_name(source), frame_offset, sys_offset, source->async_frames.num);
-	}*/
-        frame_offset = frame_time - source->last_frame_ts;
-        source->last_frame_ts += sys_offset;
+	}
 
 	while (source->last_frame_ts > next_frame->timestamp) {
 
@@ -3394,9 +3398,9 @@ static inline struct obs_source_frame *get_closest_frame(obs_source_t *source,
 		struct obs_source_frame *frame = source->async_frames.array[0];
 		da_erase(source->async_frames, 0);
 
-		if (!source->last_frame_ts)
-                        source->last_frame_ts = frame->timestamp;
-
+		if (!source->last_frame_ts) {
+			source->last_frame_ts = frame->timestamp;
+		}
 		return frame;
 	}
 
@@ -5118,8 +5122,24 @@ void obs_source_media_get_frame(obs_source_t *source,
 			      &data);
 }
 
-void obs_source_set_multi_source_sync(obs_source_t *source, bool multi_source_sync) {
-    if (!obs_source_valid(source, "obs_source_set_multi_source_sync"))
-        return;
-    source->multi_source_sync = multi_source_sync;
+void obs_source_set_multi_source_sync(obs_source_t *source,
+				      bool multi_source_sync)
+{
+	if (!obs_source_valid(source, "ternal"))
+		return;
+	source->multi_source_sync = multi_source_sync;
+}
+
+int64_t obs_source_get_server_timestamp(obs_source_t *source)
+{
+	if (!obs_source_valid(source, "obs_source_get_server_timestamp"))
+		return 0;
+	return source->cur_server_timestamp;
+}
+
+int64_t obs_source_get_external_timestamp(obs_source_t *source)
+{
+	if (!obs_source_valid(source, "obs_source_get_external_timestamp"))
+		return 0;
+	return source->cur_external_timestamp;
 }

@@ -159,17 +159,24 @@ static int mp_media_next_packet(mp_media_t *media)
 	}
 
 	//get sei content
-    if (pkt.flags & AV_PKT_FLAG_KEY) {
-        if ((pkt.data[4] & 0x1F) == 6 ||(pkt.data[10] & 0x1F) == 6) {
-                int64_t * buffer = NULL;
-                uint32_t count = 0;
-                int ret = get_sei_content(pkt.data, pkt.size, uuid,&buffer, &count);
-                if (ret >0) {
-                        media->obsframe.sei_timestamp = *((uint64_t*)buffer);
-                }
-        }
-	} else{
-        media->obsframe.sei_timestamp = 0;
+	if (pkt.flags & AV_PKT_FLAG_KEY) {
+		if ((pkt.data[4] & 0x1F) == 6 || (pkt.data[10] & 0x1F) == 6) {
+			int64_t *buffer = NULL;
+			uint32_t count = 0;
+			if (get_sei_content(pkt.data, pkt.size, ext_uuid,
+					    &buffer, &count) > 0) {
+				media->external_timestamp =
+					*((uint64_t *)buffer) * 1000000;
+			}
+			if (get_sei_content(pkt.data, pkt.size, svr_uuid,
+					    &buffer, &count) > 0) {
+				media->server_timestamp =
+					*((uint64_t *)buffer) * 1000000;
+			}
+		}
+	} else {
+		media->external_timestamp = 0;
+		media->server_timestamp = 0;
 	}
 	//end
 
@@ -343,13 +350,11 @@ static void mp_media_next_audio(mp_media_t *m)
 	audio.format = convert_sample_format(f->format);
 	audio.frames = f->nb_samples;
 
-        uint64_t tmp_ts = m->base_ts + d->frame_pts - m->start_ts + m->play_sys_ts - base_sys_ts;
-        audio.timestamp = tmp_ts + m->vtime_diff;
-        //audio.timestamp = d->frame_pts;
-        //blog(LOG_DEBUG,"[a] timestamp:%lld, tmp_ts:%lld, vtime_diff:%lld \n",
-	//     audio.timestamp, tmp_ts, m->vtime_diff);
+	audio.timestamp = m->base_ts + d->frame_pts - m->start_ts +
+			  m->play_sys_ts - base_sys_ts +
+			  m->external_timestamp_diff;
 
-        if (audio.format == AUDIO_FORMAT_UNKNOWN)
+	if (audio.format == AUDIO_FORMAT_UNKNOWN)
 		return;
 
 	m->a_cb(m->opaque, &audio);
@@ -433,13 +438,31 @@ static void mp_media_next_video(mp_media_t *m, bool preload)
 	if (frame->format == VIDEO_FORMAT_NONE)
 		return;
 
-    frame->timestamp = m->base_ts + d->frame_pts - m->start_ts + m->play_sys_ts - base_sys_ts;
-    if (frame->sei_timestamp > 0) {
-        m->vtime_diff = frame->sei_timestamp - frame->timestamp;
-        frame->timestamp = frame->sei_timestamp;
-    } else {
-        frame->timestamp += m->vtime_diff;
-    }
+	frame->timestamp = m->base_ts + d->frame_pts - m->start_ts +
+			   m->play_sys_ts - base_sys_ts;
+
+        // server timestamp
+        if (m->server_timestamp) {
+                m->server_timestamp_diff =
+                        m->server_timestamp - frame->timestamp;
+        }
+
+        if (m->server_timestamp_diff) {
+                frame->server_timestamp =
+                        frame->timestamp + m->server_timestamp_diff;
+        }
+
+	// external timestamp
+	if (m->external_timestamp) {
+		m->external_timestamp_diff =
+			m->external_timestamp - frame->timestamp;
+	}
+
+	if (m->external_timestamp_diff) {
+		frame->external_timestamp =
+			frame->timestamp + m->external_timestamp_diff;
+		frame->timestamp = frame->external_timestamp;
+	}
 
 	frame->width = f->width;
 	frame->height = f->height;
@@ -473,7 +496,7 @@ static void mp_media_calc_next_ns(mp_media_t *m)
 		m->seek_next_ts = false;
 	} else {
 #ifdef _DEBUG
-		//assert(delta >= 0);
+		assert(delta >= 0);
 #endif
 		if (delta < 0)
 			delta = 0;
@@ -559,7 +582,10 @@ static bool mp_media_reset(mp_media_t *m)
 	if (stopping && m->stop_cb)
 		m->stop_cb(m->opaque);
 
-        m->vtime_diff = 0;
+	m->external_timestamp = 0;
+	m->external_timestamp_diff = 0;
+	m->server_timestamp = 0;
+	m->server_timestamp_diff = 0;
 	return true;
 }
 

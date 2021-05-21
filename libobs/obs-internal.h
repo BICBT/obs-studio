@@ -323,8 +323,8 @@ struct obs_core_video {
 struct audio_monitor;
 
 struct audio_output_cb_info {
-        obs_audio_output_callback_t callback;
-        void *param;
+	obs_audio_output_callback_t callback;
+	void *param;
 };
 
 struct obs_core_audio {
@@ -348,8 +348,8 @@ struct obs_core_audio {
 	bool audio_with_video;
 
 	struct audio_monitor *output_monitor;
-        pthread_mutex_t audio_output_cb_list_mutex;
-        DARRAY(struct audio_output_cb_info) audio_output_cb_list;
+	pthread_mutex_t audio_output_cb_list_mutex;
+	DARRAY(struct audio_output_cb_info) audio_output_cb_list;
 };
 
 /* user sources, output channels, and displays */
@@ -773,6 +773,8 @@ struct obs_source {
 
 	// multi source sync
 	bool multi_source_sync;
+	uint64_t cur_server_timestamp;
+	uint64_t cur_external_timestamp;
 };
 
 extern struct obs_source_info *get_source_info(const char *id);
@@ -824,7 +826,7 @@ static inline void obs_source_dosignal(struct obs_source *source,
 }
 
 /* maximum timestamp variance in nanoseconds */
-#define MAX_TS_VAR 5000000000ULL
+#define MAX_TS_VAR 2000000000ULL
 
 static inline bool frame_out_of_bounds(const obs_source_t *source, uint64_t ts)
 {
