@@ -316,13 +316,15 @@ struct obs_core_video {
 
 	pthread_mutex_t task_mutex;
 	struct circlebuf tasks;
+
+	uint64_t min_source_frame_ts;
 };
 
 struct audio_monitor;
 
 struct audio_output_cb_info {
-        obs_audio_output_callback_t callback;
-        void *param;
+	obs_audio_output_callback_t callback;
+	void *param;
 };
 
 struct obs_core_audio {
@@ -346,8 +348,8 @@ struct obs_core_audio {
 	bool audio_with_video;
 
 	struct audio_monitor *output_monitor;
-        pthread_mutex_t audio_output_cb_list_mutex;
-        DARRAY(struct audio_output_cb_info) audio_output_cb_list;
+	pthread_mutex_t audio_output_cb_list_mutex;
+	DARRAY(struct audio_output_cb_info) audio_output_cb_list;
 };
 
 /* user sources, output channels, and displays */
@@ -768,6 +770,11 @@ struct obs_source {
 	enum obs_monitoring_type monitoring_type;
 
 	obs_data_t *private_settings;
+
+	// multi source sync
+	bool multi_source_sync;
+	uint64_t cur_server_timestamp;
+	uint64_t cur_external_timestamp;
 };
 
 extern struct obs_source_info *get_source_info(const char *id);

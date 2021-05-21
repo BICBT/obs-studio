@@ -1086,6 +1086,10 @@ static void async_tick(obs_source_t *source)
 		if (source->cur_async_frame) {
 			source->cur_async_frame_timestamp =
 				source->cur_async_frame->timestamp;
+			source->cur_server_timestamp =
+				source->cur_async_frame->server_timestamp;
+			source->cur_external_timestamp =
+				source->cur_async_frame->external_timestamp;
 		}
 	}
 
@@ -2630,6 +2634,8 @@ static void copy_frame_data(struct obs_source_frame *dst,
 	dst->flip = src->flip;
 	dst->full_range = src->full_range;
 	dst->timestamp = src->timestamp;
+	dst->external_timestamp = src->external_timestamp;
+	dst->server_timestamp = src->server_timestamp;
 	memcpy(dst->color_matrix, src->color_matrix, sizeof(float) * 16);
 	if (!dst->full_range) {
 		size_t const size = sizeof(float) * 3;
@@ -2732,7 +2738,7 @@ static void clean_cache(obs_source_t *source)
 	}
 }
 
-#define MAX_ASYNC_FRAMES 30
+#define MAX_ASYNC_FRAMES 125
 //if return value is not null then do (os_atomic_dec_long(&output->refs) == 0) && obs_source_frame_destroy(output)
 static inline struct obs_source_frame *
 cache_video(struct obs_source *source, const struct obs_source_frame *frame)
@@ -3294,6 +3300,13 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	uint64_t frame_time = next_frame->timestamp;
 	uint64_t frame_offset = 0;
 
+	if (source->multi_source_sync &&
+	    (source->last_frame_ts > obs->video.min_source_frame_ts &&
+	     (source->last_frame_ts - obs->video.min_source_frame_ts) <
+		     MAX_TS_VAR)) {
+		source->last_frame_ts = obs->video.min_source_frame_ts;
+	}
+
 	if (source->async_unbuffered) {
 		while (source->async_frames.num > 1) {
 			da_erase(source->async_frames, 0);
@@ -3333,8 +3346,8 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 		 * helps smooth out async rendering to frame boundaries.  In
 		 * other words, tries to keep the framerate as smooth as
 		 * possible */
-		if ((source->last_frame_ts - next_frame->timestamp) < 2000000)
-			break;
+		//if ((source->last_frame_ts - next_frame->timestamp) < 2000000)
+		//	break;
 
 		if (frame)
 			da_erase(source->async_frames, 0);
@@ -3348,7 +3361,6 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 #endif
 
 		remove_async_frame(source, frame);
-
 		if (source->async_frames.num == 1)
 			return true;
 
@@ -3386,9 +3398,9 @@ static inline struct obs_source_frame *get_closest_frame(obs_source_t *source,
 		struct obs_source_frame *frame = source->async_frames.array[0];
 		da_erase(source->async_frames, 0);
 
-		if (!source->last_frame_ts)
+		if (!source->last_frame_ts) {
 			source->last_frame_ts = frame->timestamp;
-
+		}
 		return frame;
 	}
 
@@ -5108,4 +5120,26 @@ void obs_source_media_get_frame(obs_source_t *source,
 
 	signal_handler_signal(source->context.signals, "media_get_frame",
 			      &data);
+}
+
+void obs_source_set_multi_source_sync(obs_source_t *source,
+				      bool multi_source_sync)
+{
+	if (!obs_source_valid(source, "ternal"))
+		return;
+	source->multi_source_sync = multi_source_sync;
+}
+
+int64_t obs_source_get_server_timestamp(obs_source_t *source)
+{
+	if (!obs_source_valid(source, "obs_source_get_server_timestamp"))
+		return 0;
+	return source->cur_server_timestamp;
+}
+
+int64_t obs_source_get_external_timestamp(obs_source_t *source)
+{
+	if (!obs_source_valid(source, "obs_source_get_external_timestamp"))
+		return 0;
+	return source->cur_external_timestamp;
 }

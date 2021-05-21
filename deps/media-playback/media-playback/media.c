@@ -16,6 +16,7 @@
 
 #include <obs.h>
 #include <util/platform.h>
+#include <util/sei.h>
 
 #include <assert.h>
 
@@ -156,6 +157,28 @@ static int mp_media_next_packet(mp_media_t *media)
 			     av_err2str(ret), ret);
 		return ret;
 	}
+
+	//get sei content
+	if (pkt.flags & AV_PKT_FLAG_KEY) {
+		if ((pkt.data[4] & 0x1F) == 6 || (pkt.data[10] & 0x1F) == 6) {
+			int64_t *buffer = NULL;
+			uint32_t count = 0;
+			if (get_sei_content(pkt.data, pkt.size, ext_uuid,
+					    &buffer, &count) > 0) {
+				media->external_timestamp =
+					*((uint64_t *)buffer) * 1000000;
+			}
+			if (get_sei_content(pkt.data, pkt.size, svr_uuid,
+					    &buffer, &count) > 0) {
+				media->server_timestamp =
+					*((uint64_t *)buffer) * 1000000;
+			}
+		}
+	} else {
+		media->external_timestamp = 0;
+		media->server_timestamp = 0;
+	}
+	//end
 
 	struct mp_decode *d = get_packet_decoder(media, &pkt);
 	if (d && pkt.size) {
@@ -328,7 +351,8 @@ static void mp_media_next_audio(mp_media_t *m)
 	audio.frames = f->nb_samples;
 
 	audio.timestamp = m->base_ts + d->frame_pts - m->start_ts +
-			  m->play_sys_ts - base_sys_ts;
+			  m->play_sys_ts - base_sys_ts +
+			  m->external_timestamp_diff;
 
 	if (audio.format == AUDIO_FORMAT_UNKNOWN)
 		return;
@@ -416,6 +440,29 @@ static void mp_media_next_video(mp_media_t *m, bool preload)
 
 	frame->timestamp = m->base_ts + d->frame_pts - m->start_ts +
 			   m->play_sys_ts - base_sys_ts;
+
+        // server timestamp
+        if (m->server_timestamp) {
+                m->server_timestamp_diff =
+                        m->server_timestamp - frame->timestamp;
+        }
+
+        if (m->server_timestamp_diff) {
+                frame->server_timestamp =
+                        frame->timestamp + m->server_timestamp_diff;
+        }
+
+	// external timestamp
+	if (m->external_timestamp) {
+		m->external_timestamp_diff =
+			m->external_timestamp - frame->timestamp;
+	}
+
+	if (m->external_timestamp_diff) {
+		frame->external_timestamp =
+			frame->timestamp + m->external_timestamp_diff;
+		frame->timestamp = frame->external_timestamp;
+	}
 
 	frame->width = f->width;
 	frame->height = f->height;
@@ -534,6 +581,11 @@ static bool mp_media_reset(mp_media_t *m)
 		mp_media_next_video(m, true);
 	if (stopping && m->stop_cb)
 		m->stop_cb(m->opaque);
+
+	m->external_timestamp = 0;
+	m->external_timestamp_diff = 0;
+	m->server_timestamp = 0;
+	m->server_timestamp_diff = 0;
 	return true;
 }
 

@@ -101,6 +101,11 @@ struct mp_media {
 	bool seek;
 	bool seek_next_ts;
 	int64_t seek_pos;
+
+	uint64_t external_timestamp;
+	int64_t external_timestamp_diff;
+	uint64_t server_timestamp;
+	int64_t server_timestamp_diff;
 };
 
 typedef struct mp_media mp_media_t;

@@ -231,6 +231,8 @@ struct obs_source_frame {
 	uint32_t width;
 	uint32_t height;
 	uint64_t timestamp;
+	int64_t external_timestamp;
+	int64_t server_timestamp;
 
 	enum video_format format;
 	float color_matrix[16];
@@ -1393,6 +1395,11 @@ EXPORT void obs_source_media_get_audio(obs_source_t *source,
 				       struct obs_source_audio *audio);
 EXPORT void obs_source_media_get_frame(obs_source_t *source,
 				       struct obs_source_frame *frame);
+
+/** Multi source sync */
+EXPORT void obs_source_set_multi_source_sync(obs_source_t *source, bool multi_source_sync);
+EXPORT int64_t obs_source_get_server_timestamp(obs_source_t *source);
+EXPORT int64_t obs_source_get_external_timestamp(obs_source_t *source);
 
 /* ------------------------------------------------------------------------- */
 /* Transition-specific functions */
