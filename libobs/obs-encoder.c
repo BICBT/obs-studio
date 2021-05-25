@@ -1108,6 +1108,9 @@ static void start_from_buffer(struct obs_encoder *encoder, uint64_t v_start_ts)
 }
 
 static const char *buffer_audio_name = "buffer_audio";
+
+#define MAX_WAIT_VIDEO_SECONDS 60
+
 static bool buffer_audio(struct obs_encoder *encoder, struct audio_data *data)
 {
 	profile_start(buffer_audio_name);
@@ -1123,8 +1126,13 @@ static bool buffer_audio(struct obs_encoder *encoder, struct audio_data *data)
 		/* no video yet, so don't start audio */
 		if (!v_start_ts) {
 			success = false;
-			clear_audio(encoder);
-			encoder->first_raw_ts = data->timestamp;
+			size_t size = encoder->audio_input_buffer[0].size;
+			if (size > MAX_WAIT_VIDEO_SECONDS *
+					   encoder->samplerate *
+					   sizeof(float)) {
+				clear_audio(encoder);
+				encoder->first_raw_ts = data->timestamp;
+			}
 			goto fail;
 		}
 
