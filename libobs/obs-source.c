@@ -3303,7 +3303,7 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	if (source->multi_source_sync &&
 	    (source->last_frame_ts > obs->video.min_source_frame_ts &&
 	     (source->last_frame_ts - obs->video.min_source_frame_ts) <
-		     MAX_TS_VAR)) {
+		     MAX_SYNC_DISTANCE)) {
 		source->last_frame_ts = obs->video.min_source_frame_ts;
 	}
 
