@@ -66,6 +66,7 @@ struct ffmpeg_muxer {
 	volatile bool muxing;
 
 	bool is_network;
+	pthread_mutex_t deactivate_mutex;
 };
 
 static const char *ffmpeg_mux_getname(void *type)
@@ -108,6 +109,7 @@ static void ffmpeg_mux_destroy(void *data)
 
 	os_process_pipe_destroy(stream->pipe);
 	dstr_free(&stream->path);
+	pthread_mutex_destroy(&stream->deactivate_mutex);
 	bfree(stream);
 }
 
@@ -118,6 +120,9 @@ static void *ffmpeg_mux_create(obs_data_t *settings, obs_output_t *output)
 
 	if (obs_output_get_flags(output) & OBS_OUTPUT_SERVICE)
 		stream->is_network = true;
+
+	pthread_mutex_init_value(&stream->deactivate_mutex);
+	pthread_mutex_init(&stream->deactivate_mutex, NULL);
 
 	UNUSED_PARAMETER(settings);
 	return stream;
@@ -270,14 +275,15 @@ static void build_command_line(struct ffmpeg_muxer *stream, struct dstr *cmd,
 		num_tracks++;
 	}
 
-        obs_data_t *settings = obs_output_get_settings(stream->output);
-        const char *exec_path = obs_data_get_string(settings, "exec_path");
+	obs_data_t *settings = obs_output_get_settings(stream->output);
+	const char *exec_path = obs_data_get_string(settings, "exec_path");
 
-        if (exec_path && strlen(exec_path) != 0) {
-            dstr_init_copy(cmd, exec_path);
-        } else {
-            dstr_init_move_array(cmd, os_get_executable_path_ptr(FFMPEG_MUX));
-        }
+	if (exec_path && strlen(exec_path) != 0) {
+		dstr_init_copy(cmd, exec_path);
+	} else {
+		dstr_init_move_array(cmd,
+				     os_get_executable_path_ptr(FFMPEG_MUX));
+	}
 
 	dstr_insert_ch(cmd, 0, '\"');
 	dstr_cat(cmd, "\" \"");
@@ -300,7 +306,7 @@ static void build_command_line(struct ffmpeg_muxer *stream, struct dstr *cmd,
 	}
 
 	add_muxer_params(cmd, stream);
-        obs_data_release(settings);
+	obs_data_release(settings);
 }
 
 static inline void start_pipe(struct ffmpeg_muxer *stream, const char *path)
@@ -393,16 +399,16 @@ static bool ffmpeg_mux_start(void *data)
 static int deactivate(struct ffmpeg_muxer *stream, int code)
 {
 	int ret = -1;
-
-	if (active(stream)) {
-		ret = os_process_pipe_destroy(stream->pipe);
-		stream->pipe = NULL;
-
-		os_atomic_set_bool(&stream->active, false);
-		os_atomic_set_bool(&stream->sent_headers, false);
-
-		info("Output of file '%s' stopped", stream->path.array);
+	if (!os_atomic_set_bool(&stream->active, false)) {
+		return ret;
 	}
+
+	ret = os_process_pipe_destroy(stream->pipe);
+	stream->pipe = NULL;
+
+	os_atomic_set_bool(&stream->sent_headers, false);
+
+	info("Output of file '%s' stopped", stream->path.array);
 
 	if (code) {
 		obs_output_signal_stop(stream->output, code);
@@ -422,6 +428,10 @@ static void ffmpeg_mux_stop(void *data, uint64_t ts)
 		stream->stop_ts = (int64_t)ts / 1000LL;
 		os_atomic_set_bool(&stream->stopping, true);
 		os_atomic_set_bool(&stream->capturing, false);
+
+		pthread_mutex_lock(&stream->deactivate_mutex);
+		deactivate(stream, 0);
+		pthread_mutex_unlock(&stream->deactivate_mutex);
 	}
 }
 
@@ -562,7 +572,11 @@ static void ffmpeg_mux_data(void *data, struct encoder_packet *packet)
 		}
 	}
 
-	write_packet(stream, packet);
+	pthread_mutex_lock(&stream->deactivate_mutex);
+	if (active(stream)) {
+		write_packet(stream, packet);
+	}
+	pthread_mutex_unlock(&stream->deactivate_mutex);
 }
 
 static obs_properties_t *ffmpeg_mux_properties(void *unused)
