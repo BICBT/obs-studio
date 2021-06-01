@@ -388,7 +388,10 @@ set(libobs_util_HEADERS
 	util/lexer.h
 	util/platform.h
 	util/profiler.h
-	util/profiler.hpp)
+	util/profiler.hpp
+	util/stb/stb_truetype.h
+	util/font-rasterizer.h
+	util/font-rasterizer.c)
 
 set(libobs_libobs_SOURCES
 	${libobs_PLATFORM_SOURCES}

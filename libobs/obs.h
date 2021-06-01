@@ -1129,8 +1129,9 @@ typedef void (*obs_audio_output_callback_t)(void *param,
 
 EXPORT void obs_add_audio_output_callback(obs_audio_output_callback_t callback,
 					  void *param);
-EXPORT void obs_remove_audio_output_callback(obs_audio_output_callback_t callback,
-                                          void *param);
+EXPORT void
+obs_remove_audio_output_callback(obs_audio_output_callback_t callback,
+				 void *param);
 
 enum obs_deinterlace_mode {
 	OBS_DEINTERLACE_MODE_DISABLE,
@@ -1396,10 +1397,11 @@ EXPORT void obs_source_media_get_audio(obs_source_t *source,
 EXPORT void obs_source_media_get_frame(obs_source_t *source,
 				       struct obs_source_frame *frame);
 
-/** Multi source sync */
-EXPORT void obs_source_set_multi_source_sync(obs_source_t *source, bool multi_source_sync);
+EXPORT void obs_source_set_multi_source_sync(obs_source_t *source,
+					     bool multi_source_sync);
 EXPORT int64_t obs_source_get_server_timestamp(obs_source_t *source);
 EXPORT int64_t obs_source_get_external_timestamp(obs_source_t *source);
+EXPORT void obs_source_show_timestamp(obs_source_t *source, bool show);
 
 /* ------------------------------------------------------------------------- */
 /* Transition-specific functions */
