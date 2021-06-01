@@ -1868,31 +1868,28 @@ static inline void set_eparami(gs_effect_t *effect, const char *name, int val)
 	gs_effect_set_int(param, val);
 }
 
-#define TIMESTAMP_TEXTURE_WIDTH 300
-#define TIMESTAMP_TEXTURE_HEIGHT 20
-
 void update_timestamp_texture(struct obs_source *source,
 			      const struct obs_source_frame *frame)
 {
-	int width = TIMESTAMP_TEXTURE_WIDTH;
-	int height = TIMESTAMP_TEXTURE_HEIGHT;
-	unsigned char *bitmap = calloc(width * height, sizeof(unsigned char));
+	struct font_rasterizer_bitmap bitmap = {};
+	font_rasterizer_create_bitmap(frame->width, &bitmap);
 
 	char timestamp[20];
 	sprintf(timestamp, "%llu", frame->timestamp);
 
-	font_rasterize(timestamp, width, height, bitmap);
+	font_rasterize(timestamp, &bitmap);
 
 	if (!source->timestamp_texture) {
 		source->timestamp_texture = gs_texture_create(
-			width, height, GS_A8, 1, (const uint8_t **)&bitmap,
-			GS_DYNAMIC);
+			bitmap.width, bitmap.height, GS_A8, 1,
+			(const uint8_t **)&bitmap.data, GS_DYNAMIC);
 	} else {
 		gs_texture_set_image(source->timestamp_texture,
-				     (const uint8_t *)bitmap, width, false);
+				     (const uint8_t *)bitmap.data, bitmap.width,
+				     false);
 	}
 
-	free(bitmap);
+	font_rasterizer_destroy_bitmap(&bitmap);
 }
 
 static bool update_async_texrender(struct obs_source *source,
@@ -2041,8 +2038,7 @@ static inline void obs_source_draw_timestamp_texture(struct obs_source *source,
 	param = gs_effect_get_param_by_name(effect, "image");
 	gs_effect_set_texture(param, tex);
 
-	gs_draw_sprite(tex, 0, TIMESTAMP_TEXTURE_WIDTH,
-		       TIMESTAMP_TEXTURE_HEIGHT);
+	gs_draw_sprite(tex, 0, 0, 0);
 }
 
 static void obs_source_draw_async_texture(struct obs_source *source)

@@ -8,11 +8,14 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb/stb_truetype.h"
 
-unsigned char *fontBuffer = NULL;
-stbtt_fontinfo fontinfo;
+unsigned char *rasterizer_font_buffer = NULL;
+stbtt_fontinfo rasterizer_font_info = {};
+uint32_t rasterizer_font_height = 0;
 
-bool font_rasterizer_initialize(const char *fontPath)
+bool font_rasterizer_initialize(const char *fontPath, uint32_t fontHeight)
 {
+	rasterizer_font_height = fontHeight;
+
 	/* load font file */
 	long size = 0;
 	FILE *fontFile = fopen(fontPath, "rb");
@@ -24,13 +27,13 @@ bool font_rasterizer_initialize(const char *fontPath)
 	size = ftell(fontFile);       /* how long is the file ? */
 	fseek(fontFile, 0, SEEK_SET); /* reset */
 
-	fontBuffer = malloc(size);
+	rasterizer_font_buffer = malloc(size);
 
-	fread(fontBuffer, size, 1, fontFile);
+	fread(rasterizer_font_buffer, size, 1, fontFile);
 	fclose(fontFile);
 
 	/* prepare font */
-	if (!stbtt_InitFont(&fontinfo, fontBuffer, 0)) {
+	if (!stbtt_InitFont(&rasterizer_font_info, rasterizer_font_buffer, 0)) {
 		blog(LOG_ERROR, "Failed to initialize font rasterizer");
 		return false;
 	}
@@ -40,25 +43,45 @@ bool font_rasterizer_initialize(const char *fontPath)
 
 void font_rasterizer_uninitialize()
 {
-	if (fontBuffer) {
-		free(fontBuffer);
+	if (rasterizer_font_buffer) {
+		free(rasterizer_font_buffer);
 	}
 }
 
-void font_rasterize(const char *text, int width, int height,
-		    unsigned char *bitmap)
+void font_rasterizer_create_bitmap(int width,
+				   struct font_rasterizer_bitmap *bitmap)
 {
-	if (!fontBuffer) {
+	uint32_t height = rasterizer_font_height;
+	bitmap->data = calloc(width * height, sizeof(uint8_t));
+	bitmap->width = width;
+	bitmap->height = height;
+}
+
+void font_rasterizer_destroy_bitmap(struct font_rasterizer_bitmap *bitmap)
+{
+	free(bitmap->data);
+	bitmap->data = NULL;
+	bitmap->width = 0;
+	bitmap->height = 0;
+}
+
+void font_rasterize(const char *text, struct font_rasterizer_bitmap *bitmap)
+{
+	if (rasterizer_font_height == 0) {
 		return;
 	}
 
+	uint32_t width = bitmap->width;
+	uint32_t height = bitmap->height;
+
 	/* calculate font scaling */
-	float scale = stbtt_ScaleForPixelHeight(&fontinfo, height);
+	float scale = stbtt_ScaleForPixelHeight(&rasterizer_font_info, height);
 
 	int x = 0;
 
 	int ascent, descent, lineGap;
-	stbtt_GetFontVMetrics(&fontinfo, &ascent, &descent, &lineGap);
+	stbtt_GetFontVMetrics(&rasterizer_font_info, &ascent, &descent,
+			      &lineGap);
 
 	ascent = roundf(ascent * scale);
 	descent = roundf(descent * scale);
@@ -67,19 +90,22 @@ void font_rasterize(const char *text, int width, int height,
 		/* how wide is this character */
 		int ax;
 		int lsb;
-		stbtt_GetCodepointHMetrics(&fontinfo, text[i], &ax, &lsb);
+		stbtt_GetCodepointHMetrics(&rasterizer_font_info, text[i], &ax,
+					   &lsb);
 
 		/* get bounding box for character (may be offset to account for chars that dip above or below the line */
 		int c_x1, c_y1, c_x2, c_y2;
-		stbtt_GetCodepointBitmapBox(&fontinfo, text[i], scale, scale,
-					    &c_x1, &c_y1, &c_x2, &c_y2);
+		stbtt_GetCodepointBitmapBox(&rasterizer_font_info, text[i],
+					    scale, scale, &c_x1, &c_y1, &c_x2,
+					    &c_y2);
 
 		/* compute y (different characters have different heights */
 		int y = ascent + c_y1;
 
 		/* render character (stride and offset is important here) */
 		int byteOffset = x + roundf(lsb * scale) + (y * width);
-		stbtt_MakeCodepointBitmap(&fontinfo, bitmap + byteOffset,
+		stbtt_MakeCodepointBitmap(&rasterizer_font_info,
+					  bitmap->data + byteOffset,
 					  c_x2 - c_x1, c_y2 - c_y1, width,
 					  scale, scale, text[i]);
 
@@ -88,8 +114,8 @@ void font_rasterize(const char *text, int width, int height,
 
 		/* add kerning */
 		int kern;
-		kern = stbtt_GetCodepointKernAdvance(&fontinfo, text[i],
-						     text[i + 1]);
+		kern = stbtt_GetCodepointKernAdvance(&rasterizer_font_info,
+						     text[i], text[i + 1]);
 		x += roundf(kern * scale);
 	}
 }
