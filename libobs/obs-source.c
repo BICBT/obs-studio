@@ -23,6 +23,7 @@
 #include "media-io/audio-io.h"
 #include "util/threading.h"
 #include "util/platform.h"
+#include "util/font-rasterizer.h"
 #include "util/util_uint64.h"
 #include "callback/calldata.h"
 #include "graphics/matrix3.h"
@@ -673,6 +674,11 @@ void obs_source_destroy(struct obs_source *source)
 	if (source->owns_info_id) {
 		bfree((void *)source->info.id);
 		bfree((void *)source->info.unversioned_id);
+	}
+
+	if (source->timestamp_texture) {
+		gs_texture_destroy(source->timestamp_texture);
+		source->timestamp_texture = NULL;
 	}
 
 	bfree(source);
@@ -1862,6 +1868,33 @@ static inline void set_eparami(gs_effect_t *effect, const char *name, int val)
 	gs_effect_set_int(param, val);
 }
 
+#define TIMESTAMP_TEXTURE_WIDTH 300
+#define TIMESTAMP_TEXTURE_HEIGHT 20
+
+void update_timestamp_texture(struct obs_source *source,
+			      const struct obs_source_frame *frame)
+{
+	int width = TIMESTAMP_TEXTURE_WIDTH;
+	int height = TIMESTAMP_TEXTURE_HEIGHT;
+	unsigned char *bitmap = calloc(width * height, sizeof(unsigned char));
+
+	char timestamp[20];
+	sprintf(timestamp, "%llu", frame->timestamp);
+
+	font_rasterize(timestamp, width, height, bitmap);
+
+	if (!source->timestamp_texture) {
+		source->timestamp_texture = gs_texture_create(
+			width, height, GS_A8, 1, (const uint8_t **)&bitmap,
+			GS_DYNAMIC);
+	} else {
+		gs_texture_set_image(source->timestamp_texture,
+				     (const uint8_t *)bitmap, width, false);
+	}
+
+	free(bitmap);
+}
+
 static bool update_async_texrender(struct obs_source *source,
 				   const struct obs_source_frame *frame,
 				   gs_texture_t *tex[MAX_AV_PLANES],
@@ -1995,6 +2028,23 @@ static inline void obs_source_draw_texture(struct obs_source *source,
 	gs_draw_sprite(tex, source->async_flip ? GS_FLIP_V : 0, 0, 0);
 }
 
+static inline void obs_source_draw_timestamp_texture(struct obs_source *source,
+						     gs_effect_t *effect)
+{
+	gs_texture_t *tex = source->timestamp_texture;
+	gs_eparam_t *param;
+
+	if (!tex) {
+		return;
+	}
+
+	param = gs_effect_get_param_by_name(effect, "image");
+	gs_effect_set_texture(param, tex);
+
+	gs_draw_sprite(tex, 0, TIMESTAMP_TEXTURE_WIDTH,
+		       TIMESTAMP_TEXTURE_HEIGHT);
+}
+
 static void obs_source_draw_async_texture(struct obs_source *source)
 {
 	gs_effect_t *effect = gs_get_effect();
@@ -2009,6 +2059,10 @@ static void obs_source_draw_async_texture(struct obs_source *source)
 	}
 
 	obs_source_draw_texture(source, effect);
+
+	if (source->show_timestamp) {
+		obs_source_draw_timestamp_texture(source, effect);
+	}
 
 	if (def_draw) {
 		gs_technique_end_pass(tech);
@@ -2061,6 +2115,11 @@ static void obs_source_update_async_video(obs_source_t *source)
 				update_async_textures(source, frame,
 						      source->async_textures,
 						      source->async_texrender);
+
+				if (source->show_timestamp) {
+					update_timestamp_texture(source, frame);
+				}
+
 				source->async_update_texture = false;
 			}
 
@@ -5125,7 +5184,7 @@ void obs_source_media_get_frame(obs_source_t *source,
 void obs_source_set_multi_source_sync(obs_source_t *source,
 				      bool multi_source_sync)
 {
-	if (!obs_source_valid(source, "ternal"))
+	if (!obs_source_valid(source, "obs_source_set_multi_source_sync"))
 		return;
 	source->multi_source_sync = multi_source_sync;
 }
@@ -5142,4 +5201,11 @@ int64_t obs_source_get_external_timestamp(obs_source_t *source)
 	if (!obs_source_valid(source, "obs_source_get_external_timestamp"))
 		return 0;
 	return source->cur_external_timestamp;
+}
+
+void obs_source_show_timestamp(obs_source_t *source, bool show)
+{
+	if (!obs_source_valid(source, "obs_source_show_timestamp"))
+		return;
+	source->show_timestamp = show;
 }

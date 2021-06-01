@@ -775,6 +775,9 @@ struct obs_source {
 	bool multi_source_sync;
 	uint64_t cur_server_timestamp;
 	uint64_t cur_external_timestamp;
+
+	gs_texture_t *timestamp_texture;
+	bool show_timestamp;
 };
 
 extern struct obs_source_info *get_source_info(const char *id);
