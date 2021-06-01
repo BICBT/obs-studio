@@ -27,6 +27,7 @@
 #include <libavutil/imgutils.h>
 
 static int64_t base_sys_ts = 0;
+static const uint64_t read_frame_timeout = 3000000000;
 
 static inline enum video_format convert_pixel_format(int f)
 {
@@ -157,6 +158,7 @@ static int mp_media_next_packet(mp_media_t *media)
 			     av_err2str(ret), ret);
 		return ret;
 	}
+	media->last_read_ts = os_gettime_ns();
 
 	//get sei content
 	if (pkt.flags & AV_PKT_FLAG_KEY) {
@@ -586,6 +588,7 @@ static bool mp_media_reset(mp_media_t *m)
 	m->external_timestamp_diff = 0;
 	m->server_timestamp = 0;
 	m->server_timestamp_diff = 0;
+	m->last_read_ts = 0;
 	return true;
 }
 
@@ -645,6 +648,10 @@ static int interrupt_callback(void *data)
 		pthread_mutex_unlock(&m->mutex);
 
 		m->interrupt_poll_ts = ts;
+
+		if (m->last_read_ts != 0 && (ts - m->last_read_ts > read_frame_timeout)) {
+                        stop = true;
+		}
 	}
 
 	return stop;
