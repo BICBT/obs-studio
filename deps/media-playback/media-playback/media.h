@@ -107,7 +107,7 @@ struct mp_media {
 	uint64_t server_timestamp;
 	int64_t server_timestamp_diff;
 
-	volatile uint64_t last_read_ts;
+	volatile uint64_t read_frame_ts;
 };
 
 typedef struct mp_media mp_media_t;
