@@ -1871,7 +1871,7 @@ static inline void set_eparami(gs_effect_t *effect, const char *name, int val)
 void update_timestamp_texture(struct obs_source *source,
 			      const struct obs_source_frame *frame)
 {
-	struct font_rasterizer_bitmap bitmap = {};
+	struct font_rasterizer_bitmap bitmap;
 	font_rasterizer_create_bitmap(frame->width, &bitmap);
 
 	char timestamp[20];

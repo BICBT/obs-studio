@@ -151,14 +151,15 @@ static int mp_media_next_packet(mp_media_t *media)
 	av_init_packet(&pkt);
 	new_pkt = pkt;
 
+        media->read_frame_ts = os_gettime_ns();
 	int ret = av_read_frame(media->fmt, &pkt);
+        media->read_frame_ts = 0;
 	if (ret < 0) {
 		if (ret != AVERROR_EOF && ret != AVERROR_EXIT)
 			blog(LOG_WARNING, "MP: av_read_frame failed: %s (%d)",
 			     av_err2str(ret), ret);
 		return ret;
 	}
-	media->last_read_ts = os_gettime_ns();
 
 	//get sei content
 	if (pkt.flags & AV_PKT_FLAG_KEY) {
@@ -588,7 +589,7 @@ static bool mp_media_reset(mp_media_t *m)
 	m->external_timestamp_diff = 0;
 	m->server_timestamp = 0;
 	m->server_timestamp_diff = 0;
-	m->last_read_ts = 0;
+	m->read_frame_ts = 0;
 	return true;
 }
 
@@ -649,7 +650,7 @@ static int interrupt_callback(void *data)
 
 		m->interrupt_poll_ts = ts;
 
-		if (m->last_read_ts != 0 && (ts - m->last_read_ts > read_frame_timeout)) {
+		if (m->read_frame_ts && ts - m->read_frame_ts > read_frame_timeout) {
                         stop = true;
 		}
 	}

@@ -9,7 +9,7 @@
 #include "stb/stb_truetype.h"
 
 unsigned char *rasterizer_font_buffer = NULL;
-stbtt_fontinfo rasterizer_font_info = {};
+stbtt_fontinfo rasterizer_font_info;
 uint32_t rasterizer_font_height = 0;
 
 bool font_rasterizer_initialize(const char *fontPath, uint32_t fontHeight)
