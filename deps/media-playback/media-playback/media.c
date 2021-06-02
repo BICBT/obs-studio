@@ -151,9 +151,9 @@ static int mp_media_next_packet(mp_media_t *media)
 	av_init_packet(&pkt);
 	new_pkt = pkt;
 
-        media->read_frame_ts = os_gettime_ns();
+	media->read_frame_ts = os_gettime_ns();
 	int ret = av_read_frame(media->fmt, &pkt);
-        media->read_frame_ts = 0;
+	media->read_frame_ts = 0;
 	if (ret < 0) {
 		if (ret != AVERROR_EOF && ret != AVERROR_EXIT)
 			blog(LOG_WARNING, "MP: av_read_frame failed: %s (%d)",
@@ -444,16 +444,16 @@ static void mp_media_next_video(mp_media_t *m, bool preload)
 	frame->timestamp = m->base_ts + d->frame_pts - m->start_ts +
 			   m->play_sys_ts - base_sys_ts;
 
-        // server timestamp
-        if (m->server_timestamp) {
-                m->server_timestamp_diff =
-                        m->server_timestamp - frame->timestamp;
-        }
+	// server timestamp
+	if (m->server_timestamp) {
+		m->server_timestamp_diff =
+			m->server_timestamp - frame->timestamp;
+	}
 
-        if (m->server_timestamp_diff) {
-                frame->server_timestamp =
-                        frame->timestamp + m->server_timestamp_diff;
-        }
+	if (m->server_timestamp_diff) {
+		frame->server_timestamp =
+			frame->timestamp + m->server_timestamp_diff;
+	}
 
 	// external timestamp
 	if (m->external_timestamp) {
@@ -650,8 +650,9 @@ static int interrupt_callback(void *data)
 
 		m->interrupt_poll_ts = ts;
 
-		if (m->read_frame_ts && ts - m->read_frame_ts > read_frame_timeout) {
-                        stop = true;
+		if (m->read_frame_ts &&
+		    ts - m->read_frame_ts > read_frame_timeout) {
+			stop = true;
 		}
 	}
 
