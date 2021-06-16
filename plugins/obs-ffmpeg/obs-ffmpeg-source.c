@@ -290,8 +290,11 @@ static void media_stopped(void *opaque)
 		obs_source_output_video(s->source, NULL);
 	}
 
-	if ((s->close_when_inactive || !s->is_local_file) && s->media_valid)
-		s->destroy_media = true;
+	if ((s->close_when_inactive || !s->is_local_file) && s->media_valid) {
+	    blog(LOG_INFO, "[%s] media_stopped: ", obs_source_get_name(s->source));
+        s->destroy_media = true;
+	}
+
 
 	set_media_state(s, OBS_MEDIA_STATE_ENDED);
 	obs_source_media_ended(s->source);
@@ -370,6 +373,7 @@ static void ffmpeg_source_tick(void *data, float seconds)
 	struct ffmpeg_source *s = data;
 	if (s->destroy_media) {
 		if (s->media_valid) {
+            blog(LOG_INFO, "[%s] [ffmpeg_source_tick] mp_media_free: ", obs_source_get_name(s->source));
 			mp_media_free(&s->media);
 			s->media_valid = false;
 		}
@@ -449,6 +453,7 @@ static void ffmpeg_source_update(void *data, obs_data_t *settings)
 		s->speed_percent = 100;
 
 	if (s->media_valid) {
+        blog(LOG_INFO, "[%s] [ffmpeg_source_update] mp_media_free: ", obs_source_get_name(s->source));
 		mp_media_free(&s->media);
 		s->media_valid = false;
 	}
@@ -631,8 +636,10 @@ static void ffmpeg_source_destroy(void *data)
 		if (s->reconnect_thread_valid)
 			pthread_join(s->reconnect_thread, NULL);
 	}
-	if (s->media_valid)
-		mp_media_free(&s->media);
+	if (s->media_valid) {
+        blog(LOG_INFO, "[%s] [ffmpeg_source_destroy] mp_media_free: ", obs_source_get_name(s->source));
+        mp_media_free(&s->media);
+	}
 
 	if (s->sws_ctx != NULL)
 		sws_freeContext(s->sws_ctx);
