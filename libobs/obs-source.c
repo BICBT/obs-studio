@@ -1087,7 +1087,7 @@ static void async_tick(obs_source_t *source)
 			remove_async_frame(source, source->cur_async_frame);
 			source->cur_async_frame = NULL;
 		}
-
+		uint64_t cur_async_frame_ts = source->cur_async_frame_timestamp;
 		source->cur_async_frame = get_closest_frame(source, sys_time);
 		if (source->cur_async_frame) {
 			source->cur_async_frame_timestamp =
@@ -1096,6 +1096,14 @@ static void async_tick(obs_source_t *source)
 				source->cur_async_frame->server_timestamp;
 			source->cur_external_timestamp =
 				source->cur_async_frame->external_timestamp;
+		}
+		if (cur_async_frame_ts == source->cur_async_frame_timestamp &&
+		    ++source->frame_not_changed_count > 5) {
+			blog(LOG_INFO, "[%s] frame not changed %u times",
+			     obs_source_get_name(source),
+			     source->frame_not_changed_count);
+		} else {
+			source->frame_not_changed_count = 0;
 		}
 	}
 
@@ -2793,7 +2801,8 @@ static void clean_cache(obs_source_t *source)
 	}
 }
 
-#define MAX_ASYNC_FRAMES 125
+#define MAX_ASYNC_FRAMES 30
+#define MAX_ASYNC_FRAMES_MULTI_SOURCE_SYNC 125
 //if return value is not null then do (os_atomic_dec_long(&output->refs) == 0) && obs_source_frame_destroy(output)
 static inline struct obs_source_frame *
 cache_video(struct obs_source *source, const struct obs_source_frame *frame)
@@ -2802,7 +2811,10 @@ cache_video(struct obs_source *source, const struct obs_source_frame *frame)
 
 	pthread_mutex_lock(&source->async_mutex);
 
-	if (source->async_frames.num >= MAX_ASYNC_FRAMES) {
+	uint32_t max_frames = source->multi_source_sync
+				      ? MAX_ASYNC_FRAMES_MULTI_SOURCE_SYNC
+				      : MAX_ASYNC_FRAMES;
+	if (source->async_frames.num >= max_frames) {
 		free_async_cache(source);
 		source->last_frame_ts = 0;
 		pthread_mutex_unlock(&source->async_mutex);
@@ -3396,13 +3408,6 @@ static bool ready_async_frame(obs_source_t *source, uint64_t sys_time)
 	}
 
 	while (source->last_frame_ts > next_frame->timestamp) {
-
-		/* this tries to reduce the needless frame duplication, also
-		 * helps smooth out async rendering to frame boundaries.  In
-		 * other words, tries to keep the framerate as smooth as
-		 * possible */
-		//if ((source->last_frame_ts - next_frame->timestamp) < 2000000)
-		//	break;
 
 		if (frame)
 			da_erase(source->async_frames, 0);

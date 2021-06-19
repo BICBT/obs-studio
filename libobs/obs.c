@@ -575,7 +575,6 @@ static bool obs_init_audio(struct audio_output_info *ai)
 	pthread_mutexattr_t attr;
 
 	pthread_mutex_init_value(&audio->monitoring_mutex);
-        pthread_mutex_init_value(&audio->audio_output_cb_list_mutex);
 
 	if (pthread_mutexattr_init(&attr) != 0)
 		return false;
@@ -583,8 +582,6 @@ static bool obs_init_audio(struct audio_output_info *ai)
 		return false;
 	if (pthread_mutex_init(&audio->monitoring_mutex, &attr) != 0)
 		return false;
-        if (pthread_mutex_init(&audio->audio_output_cb_list_mutex, &attr) != 0)
-                return false;
 
 	audio->user_volume = 1.0f;
 	audio->audio_with_video = true;
@@ -614,11 +611,9 @@ static void obs_free_audio(void)
 	da_free(audio->root_nodes);
 
 	da_free(audio->monitors);
-        da_free(audio->audio_output_cb_list);
 	bfree(audio->monitoring_device_name);
 	bfree(audio->monitoring_device_id);
 	pthread_mutex_destroy(&audio->monitoring_mutex);
-        pthread_mutex_destroy(&audio->audio_output_cb_list_mutex);
 
 	memset(audio, 0, sizeof(struct obs_core_audio));
 }
@@ -859,7 +854,6 @@ static bool obs_init(const char *locale, const char *module_config_path,
 	obs = bzalloc(sizeof(struct obs_core));
 
 	pthread_mutex_init_value(&obs->audio.monitoring_mutex);
-        pthread_mutex_init_value(&obs->audio.audio_output_cb_list_mutex);
 	pthread_mutex_init_value(&obs->video.gpu_encoder_mutex);
 	pthread_mutex_init_value(&obs->video.task_mutex);
 
@@ -1739,16 +1733,6 @@ void obs_set_master_volume(float volume)
 	calldata_free(&data);
 
 	obs->audio.user_volume = volume;
-}
-
-void obs_set_pgm_audio_monitor(bool pgmMonitor)
-{
-	if (pgmMonitor) {
-               obs->audio.output_monitor = audio_monitor_create(NULL);
-	} else {
-                audio_monitor_destroy(obs->audio.output_monitor);
-                obs->audio.output_monitor = NULL;
-	}
 }
 
 float obs_get_master_volume(void)
