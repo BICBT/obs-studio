@@ -420,22 +420,6 @@ static bool render_audio_lock(void *param, obs_source_t *source)
 	return true;
 }
 
-static void single_audio_output_callback(struct audio_output_data *mixes, uint64_t timestamp) {
-        struct audio_data audio_data;
-	size_t planes = audio_output_get_planes(obs->audio.audio);
-	for (size_t i = 0; i < planes; ++i) {
-                audio_data.data[i] = (uint8_t *)mixes[0].data[i];
-        };
-        audio_data.frames = AUDIO_OUTPUT_FRAMES;
-        audio_data.timestamp = timestamp;
-        pthread_mutex_lock(&obs->audio.audio_output_cb_list_mutex);
-        for (size_t i = obs->audio.audio_output_cb_list.num; i > 0; i--) {
-                struct audio_output_cb_info info = obs->audio.audio_output_cb_list.array[i - 1];
-                info.callback(info.param, &audio_data, false);
-        }
-        pthread_mutex_unlock(&obs->audio.audio_output_cb_list_mutex);
-}
-
 bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 		    uint64_t *out_ts, uint32_t mixers,
 		    struct audio_output_data *mixes)
@@ -558,28 +542,6 @@ bool audio_callback(void *param, uint64_t start_ts_in, uint64_t end_ts_in,
 		return false;
 	}
 
-        single_audio_output_callback(mixes, *out_ts);
-
 	UNUSED_PARAMETER(param);
 	return true;
-}
-
-void obs_add_audio_output_callback(obs_audio_output_callback_t callback,
-                                   void *param)
-{
-        struct audio_cb_info info = {callback, param};
-
-        pthread_mutex_lock(&obs->audio.audio_output_cb_list_mutex);
-        da_push_back(obs->audio.audio_output_cb_list, &info);
-        pthread_mutex_unlock(&obs->audio.audio_output_cb_list_mutex);
-}
-
-void obs_remove_audio_output_callback(obs_audio_output_callback_t callback,
-                                   void *param)
-{
-        struct audio_cb_info info = {callback, param};
-
-        pthread_mutex_lock(&obs->audio.audio_output_cb_list_mutex);
-        da_erase_item(obs->audio.audio_output_cb_list, &info);
-        pthread_mutex_unlock(&obs->audio.audio_output_cb_list_mutex);
 }
