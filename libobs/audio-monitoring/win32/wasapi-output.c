@@ -140,73 +140,6 @@ static bool process_audio_delay(struct audio_monitor *monitor, float **data,
 	return false;
 }
 
-static void on_audio_output_playback(void *param,
-                                     const struct audio_data *audio_data,
-                                     bool muted)
-{
-        struct audio_monitor *monitor = param;
-        IAudioRenderClient *render = monitor->render;
-        uint8_t *resample_data[MAX_AV_PLANES];
-        float vol = obs->audio.user_volume;
-        uint32_t resample_frames;
-        uint64_t ts_offset;
-        bool success;
-        BYTE *output;
-
-        if (pthread_mutex_trylock(&monitor->playback_mutex) != 0) {
-                return;
-        }
-
-        success = audio_resampler_resample(
-                monitor->resampler, resample_data, &resample_frames, &ts_offset,
-                (const uint8_t *const *)audio_data->data,
-                (uint32_t)audio_data->frames);
-        if (!success) {
-                goto unlock;
-        }
-
-//        UINT32 pad = 0;
-//        monitor->client->lpVtbl->GetCurrentPadding(monitor->client, &pad);
-//
-//        bool decouple_audio = source->async_unbuffered &&
-//                              source->async_decoupled;
-//
-//        if (monitor->source_has_video && !decouple_audio) {
-//                uint64_t ts = audio_data->timestamp - ts_offset;
-//
-//                if (!process_audio_delay(monitor, (float **)(&resample_data[0]),
-//                                         &resample_frames, ts, pad)) {
-//                        goto unlock;
-//                }
-//        }
-
-        HRESULT hr =
-                render->lpVtbl->GetBuffer(render, resample_frames, &output);
-        if (FAILED(hr)) {
-                goto unlock;
-        }
-
-        if (!muted) {
-                /* apply volume */
-                if (!close_float(vol, 1.0f, EPSILON)) {
-                        register float *cur = (float *)resample_data[0];
-                        register float *end =
-                                cur + resample_frames * monitor->channels;
-
-                        while (cur < end)
-                                *(cur++) *= vol;
-                }
-                memcpy(output, resample_data[0],
-                       resample_frames * monitor->channels * sizeof(float));
-        }
-
-        render->lpVtbl->ReleaseBuffer(render, resample_frames,
-                                      muted ? AUDCLNT_BUFFERFLAGS_SILENT : 0);
-
-        unlock:
-        pthread_mutex_unlock(&monitor->playback_mutex);
-}
-
 static void on_audio_playback(void *param, obs_source_t *source,
 			      const struct audio_data *audio_data, bool muted)
 {
@@ -281,8 +214,6 @@ static inline void audio_monitor_free(struct audio_monitor *monitor)
 	if (monitor->source) {
 		obs_source_remove_audio_capture_callback(
 			monitor->source, on_audio_playback, monitor);
-	} else {
-                obs_remove_audio_output_callback(on_audio_output_playback, monitor);
 	}
 
 	if (monitor->client)
@@ -335,7 +266,7 @@ static bool audio_monitor_init(struct audio_monitor *monitor,
 		return false;
 	}
 
-	if (source != NULL && source->info.output_flags & OBS_SOURCE_DO_NOT_SELF_MONITOR) {
+	if (source->info.output_flags & OBS_SOURCE_DO_NOT_SELF_MONITOR) {
 		obs_data_t *s = obs_source_get_settings(source);
 		const char *s_dev_id = obs_data_get_string(s, "device_id");
 		bool match = devices_match(s_dev_id, id);
@@ -466,15 +397,10 @@ static void audio_monitor_init_final(struct audio_monitor *monitor)
 	if (monitor->ignore)
 		return;
 
-	if (monitor->source) {
-                monitor->source_has_video =
-                        (monitor->source->info.output_flags & OBS_SOURCE_VIDEO) != 0;
-
-                obs_source_add_audio_capture_callback(monitor->source,
-                                                      on_audio_playback, monitor);
-	} else {
-                obs_add_audio_output_callback(on_audio_output_playback, monitor);
-	}
+	monitor->source_has_video =
+		(monitor->source->info.output_flags & OBS_SOURCE_VIDEO) != 0;
+	obs_source_add_audio_capture_callback(monitor->source,
+					      on_audio_playback, monitor);
 }
 
 struct audio_monitor *audio_monitor_create(obs_source_t *source)

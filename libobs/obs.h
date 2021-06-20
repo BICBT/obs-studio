@@ -1123,16 +1123,6 @@ EXPORT void obs_source_add_audio_capture_callback(
 EXPORT void obs_source_remove_audio_capture_callback(
 	obs_source_t *source, obs_source_audio_capture_t callback, void *param);
 
-typedef void (*obs_audio_output_callback_t)(void *param,
-					    const struct audio_data *audio_data,
-					    bool muted);
-
-EXPORT void obs_add_audio_output_callback(obs_audio_output_callback_t callback,
-					  void *param);
-EXPORT void
-obs_remove_audio_output_callback(obs_audio_output_callback_t callback,
-				 void *param);
-
 enum obs_deinterlace_mode {
 	OBS_DEINTERLACE_MODE_DISABLE,
 	OBS_DEINTERLACE_MODE_DISCARD,
@@ -2288,9 +2278,6 @@ EXPORT bool obs_get_audio_with_video(void);
 
 /** Set whether take audio with video */
 EXPORT void obs_set_audio_with_video(bool audio_with_video);
-
-/** set pgm audio monitor**/
-EXPORT void obs_set_pgm_audio_monitor(bool pgmMonitor);
 
 #ifdef __cplusplus
 }
