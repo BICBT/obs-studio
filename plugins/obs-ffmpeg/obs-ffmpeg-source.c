@@ -374,7 +374,6 @@ static void *ffmpeg_source_reconnect(void *data)
 		ffmpeg_source_start(s);
 
 finish:
-	s->reconnect_thread_valid = false;
 	return NULL;
 }
 
