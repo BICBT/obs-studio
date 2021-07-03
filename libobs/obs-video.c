@@ -746,6 +746,10 @@ static inline void video_sleep(struct obs_core_video *video, bool raw_active,
 
 	video->total_frames += count;
 	video->lagged_frames += count - 1;
+	if (count > 1) {
+		blog(LOG_INFO, "lagged frames: %u, total lagged frames: %u",
+		     count - 1, video->lagged_frames);
+	}
 
 	vframe_info.timestamp = cur_time;
 	vframe_info.count = count;

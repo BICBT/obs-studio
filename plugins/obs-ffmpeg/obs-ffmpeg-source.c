@@ -34,7 +34,6 @@
 struct ffmpeg_source {
 	mp_media_t media;
 	bool media_valid;
-	bool destroy_media;
 
 	struct SwsContext *sws_ctx;
 	int sws_width;
@@ -60,7 +59,7 @@ struct ffmpeg_source {
 
 	pthread_t reconnect_thread;
 	bool stop_reconnect;
-	bool reconnect_thread_valid;
+	volatile bool reconnect_thread_valid;
 	volatile bool reconnecting;
 	int reconnect_delay_sec;
 
@@ -247,7 +246,7 @@ static void get_frame(void *opaque, struct obs_source_frame *f)
 {
 	struct ffmpeg_source *s = opaque;
 	if (f->external_timestamp > 0) {
-                obs_source_set_multi_source_sync(s->source, true);
+		obs_source_set_multi_source_sync(s->source, true);
 	}
 	obs_source_output_video(s->source, f);
 	obs_source_media_get_frame(s->source, f);
@@ -283,6 +282,9 @@ static void get_audio(void *opaque, struct obs_source_audio *a)
 	obs_source_media_get_audio(s->source, a);
 }
 
+static void stop_reconnect_thread(struct ffmpeg_source *s);
+static void start_reconnect_thread(struct ffmpeg_source *s);
+
 static void media_stopped(void *opaque)
 {
 	struct ffmpeg_source *s = opaque;
@@ -290,8 +292,21 @@ static void media_stopped(void *opaque)
 		obs_source_output_video(s->source, NULL);
 	}
 
-	if ((s->close_when_inactive || !s->is_local_file) && s->media_valid)
-		s->destroy_media = true;
+	if ((s->close_when_inactive || !s->is_local_file) && s->media_valid) {
+		if (s->media_valid) {
+			mp_media_free(&s->media);
+			s->media_valid = false;
+		}
+
+		if (!s->is_local_file) {
+			if (!os_atomic_set_bool(&s->reconnecting, true)) {
+				FF_BLOG(LOG_WARNING, "Disconnected. "
+						     "Reconnecting...");
+			}
+			stop_reconnect_thread(s);
+			start_reconnect_thread(s);
+		}
+	}
 
 	set_media_state(s, OBS_MEDIA_STATE_ENDED);
 	obs_source_media_ended(s->source);
@@ -363,33 +378,30 @@ finish:
 	return NULL;
 }
 
+static void start_reconnect_thread(struct ffmpeg_source *s)
+{
+	s->reconnect_thread_valid = pthread_create(&s->reconnect_thread, NULL,
+						   ffmpeg_source_reconnect,
+						   s) == 0;
+	if (!s->reconnect_thread_valid) {
+		FF_BLOG(LOG_WARNING, "Could not create "
+				     "reconnect thread");
+	}
+}
+
+static void stop_reconnect_thread(struct ffmpeg_source *s)
+{
+	if (os_atomic_set_bool(&s->reconnect_thread_valid, false)) {
+		s->stop_reconnect = true;
+		pthread_join(s->reconnect_thread, NULL);
+		s->stop_reconnect = false;
+	}
+}
+
 static void ffmpeg_source_tick(void *data, float seconds)
 {
+	UNUSED_PARAMETER(data);
 	UNUSED_PARAMETER(seconds);
-
-	struct ffmpeg_source *s = data;
-	if (s->destroy_media) {
-		if (s->media_valid) {
-			mp_media_free(&s->media);
-			s->media_valid = false;
-		}
-
-		s->destroy_media = false;
-
-		if (!s->is_local_file) {
-			if (!os_atomic_set_bool(&s->reconnecting, true)) {
-				FF_BLOG(LOG_WARNING, "Disconnected. "
-						     "Reconnecting...");
-			}
-			if (pthread_create(&s->reconnect_thread, NULL,
-					   ffmpeg_source_reconnect, s) != 0) {
-				FF_BLOG(LOG_WARNING, "Could not create "
-						     "reconnect thread");
-				return;
-			}
-			s->reconnect_thread_valid = true;
-		}
-	}
 }
 
 static void ffmpeg_source_update(void *data, obs_data_t *settings)
@@ -418,12 +430,7 @@ static void ffmpeg_source_update(void *data, obs_data_t *settings)
 						 ? 10
 						 : s->reconnect_delay_sec;
 		s->is_looping = false;
-
-		if (s->reconnect_thread_valid) {
-			s->stop_reconnect = true;
-			pthread_join(s->reconnect_thread, NULL);
-			s->stop_reconnect = false;
-		}
+		stop_reconnect_thread(s);
 	}
 
 	s->close_when_inactive =
@@ -627,9 +634,7 @@ static void ffmpeg_source_destroy(void *data)
 	if (s->hotkey)
 		obs_hotkey_unregister(s->hotkey);
 	if (!s->is_local_file) {
-		s->stop_reconnect = true;
-		if (s->reconnect_thread_valid)
-			pthread_join(s->reconnect_thread, NULL);
+		stop_reconnect_thread(s);
 	}
 	if (s->media_valid)
 		mp_media_free(&s->media);
