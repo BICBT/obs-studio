@@ -33,7 +33,7 @@
 
 struct ffmpeg_source {
 	mp_media_t media;
-	bool media_valid;
+	volatile bool media_valid;
 
 	struct SwsContext *sws_ctx;
 	int sws_width;
@@ -58,7 +58,7 @@ struct ffmpeg_source {
 	bool seekable;
 
 	pthread_t reconnect_thread;
-	bool stop_reconnect;
+	volatile bool stop_reconnect;
 	volatile bool reconnect_thread_valid;
 	volatile bool reconnecting;
 	int reconnect_delay_sec;
@@ -284,6 +284,8 @@ static void get_audio(void *opaque, struct obs_source_audio *a)
 
 static void stop_reconnect_thread(struct ffmpeg_source *s);
 static void start_reconnect_thread(struct ffmpeg_source *s);
+static void free_media(struct ffmpeg_source *s);
+static void init_media(struct ffmpeg_source *s);
 
 static void media_stopped(void *opaque)
 {
@@ -292,20 +294,12 @@ static void media_stopped(void *opaque)
 		obs_source_output_video(s->source, NULL);
 	}
 
-	if ((s->close_when_inactive || !s->is_local_file) && s->media_valid) {
-		if (s->media_valid) {
-			mp_media_free(&s->media);
-			s->media_valid = false;
-		}
-
-		if (!s->is_local_file) {
-			if (!os_atomic_set_bool(&s->reconnecting, true)) {
-				FF_BLOG(LOG_WARNING, "Disconnected. "
-						     "Reconnecting...");
-			}
-			stop_reconnect_thread(s);
-			start_reconnect_thread(s);
-		}
+	if (!s->is_local_file && s->media_valid) {
+		os_atomic_set_bool(&s->reconnecting, true);
+		FF_BLOG(LOG_WARNING, "Disconnected. "
+				     "Reconnecting...");
+		stop_reconnect_thread(s);
+		start_reconnect_thread(s);
 	}
 
 	set_media_state(s, OBS_MEDIA_STATE_ENDED);
@@ -315,24 +309,7 @@ static void media_stopped(void *opaque)
 static void ffmpeg_source_open(struct ffmpeg_source *s)
 {
 	if (s->input && *s->input) {
-		struct mp_media_info info = {
-			.opaque = s,
-			.v_cb = get_frame,
-			.v_preload_cb = preload_frame,
-			.v_seek_cb = seek_frame,
-			.a_cb = get_audio,
-			.stop_cb = media_stopped,
-			.path = s->input,
-			.format = s->input_format,
-			.buffering = s->buffering_mb * 1024 * 1024,
-			.speed = s->speed_percent,
-			.force_range = s->range,
-			.hardware_decoding = s->is_hw_decoding,
-			.is_local_file = s->is_local_file || s->seekable,
-			.reconnecting = s->reconnecting,
-		};
-
-		s->media_valid = mp_media_init(&s->media, &info);
+		init_media(s);
 	}
 }
 
@@ -356,6 +333,8 @@ static void ffmpeg_source_start(struct ffmpeg_source *s)
 static void *ffmpeg_source_reconnect(void *data)
 {
 	struct ffmpeg_source *s = data;
+
+	free_media(s);
 
 	for (int i = 0; i < s->reconnect_delay_sec * 100; i++) {
 		os_sleep_ms(10);
@@ -394,6 +373,36 @@ static void stop_reconnect_thread(struct ffmpeg_source *s)
 		s->stop_reconnect = true;
 		pthread_join(s->reconnect_thread, NULL);
 		s->stop_reconnect = false;
+	}
+}
+
+static void free_media(struct ffmpeg_source *s)
+{
+	if (os_atomic_set_bool(&s->media_valid, false)) {
+		mp_media_free(&s->media);
+	}
+}
+
+static void init_media(struct ffmpeg_source *s)
+{
+	struct mp_media_info info = {
+		.opaque = s,
+		.v_cb = get_frame,
+		.v_preload_cb = preload_frame,
+		.v_seek_cb = seek_frame,
+		.a_cb = get_audio,
+		.stop_cb = media_stopped,
+		.path = s->input,
+		.format = s->input_format,
+		.buffering = s->buffering_mb * 1024 * 1024,
+		.speed = s->speed_percent,
+		.force_range = s->range,
+		.hardware_decoding = s->is_hw_decoding,
+		.is_local_file = s->is_local_file || s->seekable,
+		.reconnecting = s->reconnecting,
+	};
+	if (!os_atomic_set_bool(&s->media_valid, true)) {
+		s->media_valid = mp_media_init(&s->media, &info);
 	}
 }
 
@@ -454,10 +463,7 @@ static void ffmpeg_source_update(void *data, obs_data_t *settings)
 	if (s->speed_percent < 1 || s->speed_percent > 200)
 		s->speed_percent = 100;
 
-	if (s->media_valid) {
-		mp_media_free(&s->media);
-		s->media_valid = false;
-	}
+	free_media(s);
 
 	bool active = obs_source_active(s->source);
 	if (!s->close_when_inactive || active)
@@ -635,8 +641,8 @@ static void ffmpeg_source_destroy(void *data)
 	if (!s->is_local_file) {
 		stop_reconnect_thread(s);
 	}
-	if (s->media_valid)
-		mp_media_free(&s->media);
+
+	free_media(s);
 
 	if (s->sws_ctx != NULL)
 		sws_freeContext(s->sws_ctx);
