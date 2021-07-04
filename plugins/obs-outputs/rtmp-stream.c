@@ -97,8 +97,9 @@ static void rtmp_stream_destroy(void *data)
 		pthread_join(stream->send_thread, NULL);
 
 	} else if (connecting(stream) || active(stream)) {
-		if (stream->connecting)
+		if (os_atomic_set_bool(&stream->connecting, false)) {
 			pthread_join(stream->connect_thread, NULL);
+		}
 
 		stream->stop_ts = 0;
 		os_event_signal(stream->stop_event);
@@ -200,8 +201,9 @@ static void rtmp_stream_stop(void *data, uint64_t ts)
 	if (stopping(stream) && ts != 0)
 		return;
 
-	if (connecting(stream))
+	if (os_atomic_set_bool(&stream->connecting, false)) {
 		pthread_join(stream->connect_thread, NULL);
+	}
 
 	stream->stop_ts = ts / 1000ULL;
 
@@ -1134,10 +1136,11 @@ static void *connect_thread(void *data)
 		info("Connection to %s failed: %d", stream->path.array, ret);
 	}
 
-	if (!stopping(stream))
+	if (!stopping(stream) &&
+	    os_atomic_set_bool(&stream->connecting, false)) {
 		pthread_detach(stream->connect_thread);
+	}
 
-	os_atomic_set_bool(&stream->connecting, false);
 	return NULL;
 }
 
